@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel
+      POSTGRES_DB: sentinel
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "sentinel"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    profiles: ["app"]          # only starts with: --profile app
+    image: sentinel-backend
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    environment:
+      DATABASE_URL: postgres://sentinel:sentinel@postgres:5432/sentinel
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_SECRET_KEY: dev-only-secret
+      DJANGO_DEBUG: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
