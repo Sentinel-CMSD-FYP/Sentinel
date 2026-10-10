@@ -1,0 +1,13 @@
+# Farnebäck optical flow (live Tier 1 movement model).
+# Values are the OpenCV tutorial defaults; tune against DroneCrowd head tracks.
+
+downscale: 0.25   # 1920x1080 -> 480x270 before computing flow
+
+params:
+  pyr_scale: 0.5
+  levels: 3
+  winsize: 15
+  iterations: 3
+  poly_n: 5
+  poly_sigma: 1.2
+  flags: 0
