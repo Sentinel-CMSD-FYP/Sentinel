@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import time
+from collections.abc import Iterator
+from itertools import islice
 from pathlib import Path
 
 import cv2
@@ -44,9 +46,38 @@ def draw_arrows(img: np.ndarray, flow: FlowField, rows: int, cols: int, gain: fl
             cv2.arrowedLine(img, (x, y), tip, (255, 255, 255), 2, tipLength=0.3)
 
 
+def open_frames(
+    path: Path, seq: str | None, fps: float | None
+) -> tuple[Iterator[np.ndarray], float, tuple[int, int]]:
+    """Frames from an mp4, or from a folder of ``img<seq><frame>.jpg`` (DroneCrowd layout)."""
+    if path.is_dir():
+        files = sorted(path.glob(f"img{seq}*.jpg" if seq else "*.jpg"))
+        if not files:
+            raise SystemExit(f"no jpg frames in {path} (seq={seq})")
+        h, w = cv2.imread(str(files[0])).shape[:2]
+        return (cv2.imread(str(f)) for f in files), fps or 30.0, (w, h)
+
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        raise SystemExit(f"cannot open {path}")
+    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+    def read() -> Iterator[np.ndarray]:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                cap.release()
+                return
+            yield frame
+
+    return read(), fps or cap.get(cv2.CAP_PROP_FPS) or 30.0, size
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("video", type=Path)
+    ap.add_argument("video", type=Path, help="mp4 file, or a folder of jpg frames")
+    ap.add_argument("--seq", default=None, help="sequence id in a frame folder, e.g. 011")
+    ap.add_argument("--fps", type=float, default=None, help="override the frame rate")
     ap.add_argument("--out", type=Path, default=None, help="annotated mp4 (omit for stats only)")
     ap.add_argument("--config", type=Path, default=Path("ml/configs/flow_farneback.yaml"))
     ap.add_argument("--start", type=int, default=0, help="first frame to read")
@@ -58,12 +89,7 @@ def main() -> None:
     ap.add_argument("--no-arrows", action="store_true")
     args = ap.parse_args()
 
-    cap = cv2.VideoCapture(str(args.video))
-    if not cap.isOpened():
-        raise SystemExit(f"cannot open {args.video}")
-    src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    cap.set(cv2.CAP_PROP_POS_FRAMES, args.start)
+    frames, src_fps, size = open_frames(args.video, args.seq, args.fps)
 
     cfg = FarnebackConfig.from_yaml(args.config)
     flow = FarnebackFlow(cfg)
@@ -79,13 +105,8 @@ def main() -> None:
 
     ms_all: list[float] = []
     mean_all: list[float] = []
-    idx = args.start - 1
     used = 0
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        idx += 1
+    for idx, frame in enumerate(islice(frames, args.start, None), args.start):
         if (idx - args.start) % args.stride:
             continue
         t0 = time.perf_counter()
@@ -109,7 +130,6 @@ def main() -> None:
         if args.max_frames and used >= args.max_frames:
             break
 
-    cap.release()
     if writer:
         writer.release()
     if not ms_all:
