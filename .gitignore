@@ -13,6 +13,8 @@ venv/
 apps/backend/staticfiles/
 apps/backend/media/
 
+.claude/
+
 # Node
 node_modules/
 apps/frontend/dist/

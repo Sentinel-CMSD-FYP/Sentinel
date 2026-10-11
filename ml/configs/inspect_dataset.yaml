@@ -1,0 +1,5 @@
+# Config for eval/inspect_dataset.py (P0-3). Read-only inspection of DroneCrowd.
+root: data/dronecrowd
+out_dir: data/outputs/inspect
+n_samples: 12
+seed: 0
