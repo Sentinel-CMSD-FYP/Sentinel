@@ -111,6 +111,8 @@ def main() -> None:
     ap.add_argument("--config", type=Path, default=Path("ml/configs/flow_farneback.yaml"))
     ap.add_argument("--gap", type=int, nargs="+", default=[1, 5, 10], help="frames between pair")
     ap.add_argument("--downscale", type=float, nargs="+", default=[0.25, 0.5, 1.0])
+    ap.add_argument("--winsize", type=int, nargs="+", default=None,
+                    help="Farnebäck window sizes to compare (default: the config's)")
     ap.add_argument("--pairs", type=int, default=20, help="frame pairs sampled per setting")
     ap.add_argument("--radius", type=float, default=6.0, help="window radius in original px")
     ap.add_argument("--move-thresh", type=float, default=2.0,
@@ -126,21 +128,24 @@ def main() -> None:
     print(f"seq {args.seq}: {n_frames} frames, {args.pairs} pairs per setting, "
           f"window radius {args.radius:g} px, moving = true disp >= {args.move_thresh:g} px")
     print("displacements are original px over the gap; zero = error of predicting no motion\n")
-    cols = ["downscale", "gap", "n", "n_mov", "true_mean", "epe", "epe_mov", "zero_epe_mov",
-            "slope", "corr", "ang_med", "bg_med", "ms"]
-    print(f"{'scale':>5} {'gap':>3} {'heads':>6} {'moving':>6} {'true':>5} {'epe':>5} "
-          f"{'epe_m':>5} {'zero_m':>6} {'slope':>5} {'corr':>5} {'ang°':>5} {'bg':>5} {'ms':>6}")
+    cols = ["downscale", "winsize", "gap", "n", "n_mov", "true_mean", "epe", "epe_mov",
+            "zero_epe_mov", "slope", "corr", "ang_med", "bg_med", "ms"]
+    print(f"{'scale':>5} {'win':>3} {'gap':>3} {'heads':>6} {'moving':>6} {'true':>5} "
+          f"{'epe':>5} {'epe_m':>5} {'zero_m':>6} {'slope':>5} {'corr':>5} {'ang°':>5} "
+          f"{'bg':>5} {'ms':>6}")
 
     rows = []
+    wins = args.winsize or [base.params.winsize]
     for gap in args.gap:
         starts = [int(s) for s in np.linspace(1, n_frames - gap, args.pairs)]
-        for s in args.downscale:
-            cfg = replace(base, downscale=s)
+        for s, win in ((s, w) for s in args.downscale for w in wins):
+            cfg = replace(base, downscale=s, params=replace(base.params, winsize=win))
             r = evaluate(args.root, args.seq, cfg, gap, starts, args.radius,
                          args.move_thresh, np.random.default_rng(0))
-            r = {"downscale": s, "gap": gap, **r}
+            r = {"downscale": s, "winsize": win, "gap": gap, **r}
             rows.append(r)
-            print(f"{s:>5g} {gap:>3} {r['n']:>6.0f} {r['n_mov']:>6.0f} {r['true_mean']:>5.2f} "
+            print(f"{s:>5g} {win:>3} {gap:>3} {r['n']:>6.0f} {r['n_mov']:>6.0f} "
+                  f"{r['true_mean']:>5.2f} "
                   f"{r['epe']:>5.2f} {r['epe_mov']:>5.2f} {r['zero_epe_mov']:>6.2f} "
                   f"{r['slope']:>5.2f} {r['corr']:>5.2f} {r['ang_med']:>5.0f} "
                   f"{r['bg_med']:>5.2f} {r['ms']:>6.0f}")
