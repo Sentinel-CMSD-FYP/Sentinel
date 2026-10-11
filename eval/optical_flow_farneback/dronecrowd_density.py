@@ -4,7 +4,7 @@ Reads the per-frame ``GT_img<seq><frame>.mat`` files (rows of ``x, y, id``) and
 prints one line per sequence, densest first. Used to pick test clips for flow:
 dense and moving beats sparse and static.
 
-    python eval/dronecrowd_density.py data/DroneCrowd/test_data/ground_truth
+    python eval/optical_flow_farneback/dronecrowd_density.py data/DroneCrowd/test_data/ground_truth
 """
 
 from __future__ import annotations
