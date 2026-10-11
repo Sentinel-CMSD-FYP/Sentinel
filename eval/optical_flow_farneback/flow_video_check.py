@@ -5,7 +5,7 @@ Qualitative check on real footage; the synthetic-frame unit tests live in
 because frame registration is not built yet and camera drift would show up as
 crowd motion.
 
-    python eval/flow_video_check.py clip.mp4 --out out/clip_flow.mp4
+    python eval/optical_flow_farneback/flow_video_check.py clip.mp4 --out out/clip_flow.mp4
 """
 
 from __future__ import annotations

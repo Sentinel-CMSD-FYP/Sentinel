@@ -6,7 +6,7 @@ flow in a small window around the head. All displacements are original-frame pix
 over the whole gap. Zero flow is the baseline to beat: DroneCrowd heads barely move
 (about 0.5 px/frame at 1080p), so a model can look fine while predicting nothing.
 
-    python eval/flow_vs_heads.py data/DroneCrowd/test_data --seq 023 \\
+    python eval/optical_flow_farneback/flow_vs_heads.py data/DroneCrowd/test_data --seq 023 \\
         --gap 1 5 10 --downscale 0.25 0.5 1.0
 """
 
