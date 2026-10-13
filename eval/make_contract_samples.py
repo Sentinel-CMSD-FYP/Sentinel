@@ -23,7 +23,7 @@ import yaml
 NOTE = (
     "SAMPLE built from DroneCrowd ground truth for format illustration only. "
     "Not model output: score is fixed at 1.0, track_id is the dataset person ID, "
-    "altitude and fps are assumed, not measured."
+    "altitude is assumed (60 m), not measured; fps 25 is the published DroneCrowd value."
 )
 
 
@@ -48,6 +48,7 @@ def header(cfg: dict) -> dict:
         "clip_id": cfg["clip_id"],
         "frame_size": cfg["frame_size"],
         "fps": cfg["fps"],
+        "frame_stride": cfg["frame_stride"],
         "altitude_m": cfg["altitude_m"],
         "altitude_source": "assumed_constant",
         "_note": NOTE,
@@ -68,6 +69,7 @@ def validate(points: dict, tracks: dict) -> None:
         assert isinstance(doc["clip_id"], str)
         w, h = doc["frame_size"]
         assert isinstance(doc["fps"], (int, float)) or doc["fps"] is None
+        assert isinstance(doc["frame_stride"], int) and doc["frame_stride"] >= 1
         assert isinstance(doc["altitude_m"], (int, float))
         assert doc["altitude_source"] in ("assumed_constant", "telemetry")
         assert all(k.isdigit() for k in doc["frames"])

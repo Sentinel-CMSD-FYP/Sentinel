@@ -18,6 +18,8 @@ Evidence: script output on 2026-10-11, Ahmed's review of the 12 images, Claude's
 
 Alternatives & why not: not applicable yet.
 
+From the DroneCrowd paper (Wen et al., arXiv 2105.02440, read 2026-10-14): videos are recorded at **25 fps** at 1920x1080. Its tables also list per-video attributes including "Night", but those attribute labels are not in the files we have. The 455 max people per frame in the paper matches our train maximum (455).
+
 Decisions made by Ahmed (2026-10-11):
 1. **Validation split:** hold out about 10 of the 82 train clips (fixed seed) as our own validation. The official test set is used only for final numbers. The exact clip list is still to be written (B-1).
 2. **Altitude for E:** one config constant (proposed 60 m, middle of the 40-80 m range). Not a measured value, so label it as an assumption in results.

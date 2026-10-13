@@ -3,9 +3,10 @@
  "clip_id": "clip_011",
  "frame_size": [1920, 1080],
  "fps": 25,
+ "frame_stride": 1,
  "altitude_m": 60.0,
  "altitude_source": "assumed_constant",
- "_note": "SAMPLE built from DroneCrowd ground truth for format illustration only. Not model output: score is fixed at 1.0, track_id is the dataset person ID, altitude and fps are assumed, not measured.",
+ "_note": "SAMPLE built from DroneCrowd ground truth for format illustration only. Not model output: score is fixed at 1.0, track_id is the dataset person ID, altitude is assumed (60 m), not measured; fps 25 is the published DroneCrowd value.",
  "frames": {
   "35": [
    [937.0, 881.0, 1.0],
