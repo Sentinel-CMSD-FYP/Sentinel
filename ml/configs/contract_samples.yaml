@@ -1,0 +1,10 @@
+# Config for eval/make_contract_samples.py (P0-5). Samples come from ground truth.
+gt_dir: data/dronecrowd/test_data-001/test_data/ground_truth
+clip_id: clip_011
+frame_size: [1920, 1080]
+start_frame: 35        # 0-based clip index; ID 90 first appears at frame 37
+n_frames: 5
+n_persistent_ids: 11
+fps: 25                # given by Ahmed; not read from the dataset files
+altitude_m: 60.0       # assumed constant (midpoint of 40-80 m); dataset has no altitude
+out_dir: docs/samples
