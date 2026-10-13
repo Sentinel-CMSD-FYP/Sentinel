@@ -18,8 +18,11 @@ Evidence: script output on 2026-10-11, Ahmed's review of the 12 images, Claude's
 
 Alternatives & why not: not applicable yet.
 
-Open issues (need Ahmed's decision):
-1. **Validation split.** Val is not independent. Proposal: hold out about 10 of the 82 train clips (fixed seed) as our own validation. Official test used only for final numbers. Pending.
-2. **Altitude for E.** The dataset has none. Options: one config constant (e.g. 60 m, mid of 40-80 m) or a per-clip value set by Ahmed. Pending.
-3. **Night clips.** Decide whether to report F1 with and without the dark clips. Pending.
-4. Only 12 frames were looked at, so the "dots on heads" check is a spot check.
+Decisions made by Ahmed (2026-10-11):
+1. **Validation split:** hold out about 10 of the 82 train clips (fixed seed) as our own validation. The official test set is used only for final numbers. The exact clip list is still to be written (B-1).
+2. **Altitude for E:** one config constant (proposed 60 m, middle of the 40-80 m range). Not a measured value, so label it as an assumption in results.
+3. **Night clips:** no separate "without night" F1. Report on all clips.
+
+Open issues:
+- Only 12 frames were looked at, so the "dots on heads" check is a spot check.
+- Exact validation clip list and seed to be chosen and recorded in B-1.
