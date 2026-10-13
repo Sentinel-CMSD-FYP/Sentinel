@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clip metadata and layer manifest",
+  "type": "object",
+  "required": ["schema_version", "clip_id", "fps", "frame_size", "n_frames", "layers"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "clip_id": {"type": "string", "minLength": 1},
+    "name": {"type": "string"},
+    "fps": {"type": "number", "exclusiveMinimum": 0},
+    "frame_size": {
+      "type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2
+    },
+    "n_frames": {"type": "integer", "minimum": 1},
+    "video_url": {"type": "string"},
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["layer", "type", "label"],
+        "properties": {
+          "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "type": {"enum": ["grid", "points", "tracks"]},
+          "label": {"type": "string"},
+          "units": {"type": "string"},
+          "default_visible": {"type": "boolean"},
+          "style": {
+            "type": "object",
+            "description": "Hints for the renderer, e.g. {\"render\": \"arrows\"} or {\"render\": \"heatmap\", \"field\": \"density\"}."
+          }
+        }
+      }
+    }
+  }
+}
