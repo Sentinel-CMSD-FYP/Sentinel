@@ -15,7 +15,7 @@ Decision / findings (in progress; GPU demo not run yet):
 - **Output formats:**
   - `pt_pred.py` saves `x, y, score` per frame as `*_loc.txt`.
   - `infer_video.py` saves only `frame,x,y` with no scores. B-3 should use the `pt_pred.py` route, or our own script, to keep scores.
-- **Input size:** frames are resized to 1920x1088 (1080 padded to 1088). `pt_pred.py` rescales points back to the original size.
+- **Input size:** frames are **resized (stretched, not padded)** from 1920x1080 to 1920x1088 with `A.Resize` (linear), then normalised with the config's mean/std. The `dronecrowd.yaml` comment says "padded", but the code in `dot_datamodule.py` and `infer_video.py` resizes. `pt_pred.py` scales y back by 1080/1088. (Corrected 2026-10-14 while writing B-3; the first version of this note said "padded".)
 
 Evidence: README, `configs/dronecrowd.yaml`, `pt_pred.py`, `infer_video.py`, `dot_datamodule.py` read at the commit above. No GPU run yet.
 
@@ -36,7 +36,17 @@ Errors hit and fixes:
 4. `TypeError: Conv2dReLU.__init__() got an unexpected keyword argument 'use_batchnorm'`: Kaggle had a newer `segmentation-models-pytorch`. Fixed with `pip install segmentation-models-pytorch==0.3.4 timm==0.9.7` (the repo's pins), then restarting the Python session.
 5. Note: the model downloads ImageNet encoder starting weights from the internet at startup (mit_b2). Internet must be on. The checkpoint overwrites them.
 
+## B-3 notes (2026-10-14)
+- `sentinel_ml/localization/infer.py` runs the released checkpoint on a split and writes contract v1.0 points files. Score = sigmoid of the raw logit that `postprocessing` returns in its 4th column. Points are saved down to `min_score: 0.05` (the repo's own cut-off is 0.2; B-4 sweeps 0.1-0.9). Not tuned.
+- Real-model check on this laptop, CPU, torch 2.14.1, smp 0.3.4: val clip 006, frames 0-1, 13.1 s for 2 frames (includes first-call warm-up), 527 and 535 points per frame at the 0.05 floor, score range 0.05-0.78. Contract check passed.
+- Smoke score only (plumbing check, 2 frames of one val clip, 10 px): thr=0.05 P 0.617 R 0.833 F1 0.709; thr=0.2 P 0.901 R 0.785 F1 0.839; thr=0.5 P 0.988 R 0.307 F1 0.468. Not a result.
+- **Validation inference on Kaggle (Ahmed, 2026-10-14):** Tesla T4, fp32, batch 1, released DOT+PD DroneCrowd checkpoint, val split (10 clips, 3000 frames), `min_score` 0.05. Total 626.1 s for 3000 frames = **4.79 frames/s** for B alone, including image decode and JSON building (about 62-64 s per 300-frame clip). This is not the B+E benchmark and not the RTX 4070 (E-5 covers that). GPU 2-frame check gave 1062 points, identical to the laptop CPU run.
+- Output: 10 contract-valid files, 859,151 points in total (mean 286.4 per frame; per-clip frame medians from 87 to 546), score range 0.05-0.93, median 0.246. All 10 files pass `check_doc`, have frames 0-299, and match the point counts Kaggle printed. Files are in `data/outputs/points/val/` (git-ignored).
+- **Our validation clips were in the released checkpoint's training data.** The authors trained on the official `train_data` (every 4th frame), and our `val` clips are held out from that same folder. So the released weights have seen our val clips, and a threshold picked on them may be biased (more confident on seen images). Test clips were not trained on (but see the checkpoint-selection caveat above).
+
 Open issues:
+- Val-vs-train overlap above affects B-4 (threshold choice). Options to discuss: accept and label it, or fine-tune/train our own model on the 72 train clips only.
+- `docs/contracts.md` says "DOT pads 1080 to 1088"; the code resizes (stretches). Wording only, no format change; waiting for Ahmed's OK to correct it.
 - Visual check of the demo frame (are circles on people, are the top-edge points false positives): waiting on Ahmed.
 - Kaggle run is not the 4070 environment. The 4070 setup was not done.
 - Mapping of our data folder layout to the repo's expected layout.
