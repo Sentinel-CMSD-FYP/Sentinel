@@ -1,0 +1,11 @@
+# Config for eval/count_error.py. Paths are relative to the repo root.
+# Bin cutoffs and the threshold were fixed BEFORE any count results were computed
+# (decision 0005). Do not change them after seeing results.
+data_config: ml/configs/dronecrowd_data.yaml
+lighting_tags: data/manifests/lighting_tags.yaml
+threshold: 0.2                  # score threshold chosen on val (decision 0004)
+bin_cutoffs: [100, 200]         # GT people per frame: sparse < 100, moderate 100-200, dense > 200
+# Draft Phase 0 sheet, section 4.2 (unsigned draft, not in the repo). Shown for reference only;
+# nothing is called pass or fail.
+provisional_targets_pct: {sparse: 15, moderate: 15, dense: 25}
+out_dir: data/outputs/count_error

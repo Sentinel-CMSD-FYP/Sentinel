@@ -1,0 +1,52 @@
+# Lighting tag per clip. Fill in by looking at ONE frame per clip (the contact sheets in
+# data/outputs/contact_sheets/), without looking at any scores. Ideally someone who has
+# not seen the results does it, or two people tag independently and settle differences.
+# Do not change a tag after results have been computed.
+#
+#   day   = full daylight, hard shadows, normal colours
+#   dusk  = low or fading light: long soft shadows, warm or dim light, colours still visible
+#   night = artificial light dominates: dark scene, lit streets or lamps
+#
+# Replace each null with day, dusk or night. Tagged by: _Ahmed   Date: 14/10/2026
+val:
+  6: day
+  47: day
+  52: day
+  59: day
+  67: day
+  71: dusk
+  73: dusk
+  84: day
+  85: day
+  89: day
+test:
+  11: day
+  15: day
+  16: day
+  17: day
+  18: day
+  22: day
+  23: day
+  24: day
+  34: day
+  35: day
+  42: day
+  43: day
+  44: day
+  61: day
+  62: day
+  63: day
+  65: day
+  69: night
+  70: night
+  74: night
+  75: day
+  82: day
+  88: day
+  95: day
+  101: day
+  103: day
+  105: day
+  108: day
+  111: day
+  112: day

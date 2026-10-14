@@ -37,7 +37,7 @@ Reason: F1 is highest at 0.20 to 0.22 and the top is flat (0.8635 vs 0.8637, a g
 **DroneCrowd official test split, 30 clips, 9000 frames, 10 px, thr=0.2, released DOT+PD checkpoint: precision 0.7180, recall 0.6616, F1 0.6887** (TP 817,116, FP 320,864, FN 417,962).
 - Predictions made on Kaggle T4: 9000 frames in 1881.8 s = 4.78 frames/s for B alone (not the B+E benchmark, not the 4070). All 30 files passed the contract check and matched the point counts Kaggle printed (2,710,706 points in total).
 - Source files: `data/outputs/points/test/`, scores in `data/outputs/b4/test/` (git-ignored).
-- **Status: no numeric F1 target exists in the Phase 0 sheet, so this is reported, not marked pass or fail.** Ahmed and the team can set a target.
+- **Status: no numeric F1 target exists in the Phase 0 sheet, so this is reported, not marked pass or fail.** Ahmed decided (2026-10-14) not to set one until we have our own footage; the earlier idea of F1 >= 0.70 was withdrawn (see 0005).
 
 ### The test F1 is far below the val F1 (0.6887 vs 0.8635)
 Facts from the per-clip table at thr 0.2 (diagnosis only, the threshold was not changed):
@@ -45,7 +45,25 @@ Facts from the per-clip table at thr 0.2 (diagnosis only, the threshold was not 
 - The worst clips are mostly low in recall (clip 74 R 0.214, clip 17 R 0.209, clip 18 R 0.233), i.e. the model misses most people there. Clip 70, the dark clip, has F1 0.472.
 - On val, every clip was between 0.842 and 0.914.
 
-Likely contributors (not verified, to investigate if needed):
+### What the frames and a recall ceiling show (diagnosis, 2026-10-14; threshold stays 0.2)
+Frames drawn with `eval/overlay_check.py` (frame 150 of each clip, GT red, predictions at 0.2 cyan):
+- Clips 74, 69, 70 are night clips (mean brightness 38, 31, 25 of 255). In clip 74 the people are tiny and sit in dark areas; the model finds 26 of 110.
+- Clips 17 and 18 are not dark (brightness 95, 87): a dusk plaza with long shadows, and people look larger than in most clips. GT dots sit on the people; the model finds about a third (clip 17: 41 of 161).
+- Clip 35 is bright (114) and also scores low, cause not looked at in detail.
+- Best clip for contrast, 75: 81 of 96 found.
+Recall ceiling: the most any threshold could give is the recall at the lowest saved score (0.05). Scored once on test for diagnosis only, not used to choose anything:
+| clip | recall @0.2 | recall @0.05 | precision @0.05 |
+|---|---|---|---|
+| 74 | 0.214 | 0.555 | 0.233 |
+| 17 | 0.209 | 0.742 | 0.242 |
+| 18 | 0.233 | 0.712 | 0.208 |
+| 35 | 0.321 | 0.559 | 0.156 |
+| 69 | 0.378 | 0.553 | 0.219 |
+| 70 | 0.341 | 0.618 | 0.339 |
+| 75 (best) | 0.870 | 0.960 | 0.451 |
+Over all 30 test clips at 0.05: precision 0.3718, recall 0.8161, F1 0.5109. So a lower threshold lifts recall on the weak clips but floods them with false points (precision about 0.2 to 0.3); it does not fix them. The model is under-confident on night and dusk/large-scale scenes. Note this makes val misleading for these scenes: val clip 71 is dark and scored 0.862 only because the model trained on it.
+
+Likely contributors (not fully verified):
 - The released weights were trained on our val clips, so val was optimistic (known, see caveats). Test clips are unseen.
 - Some test scenes may differ from the training scenes (altitude, density, lighting). We have not looked at the frames of the worst clips.
 - GT noise (decision 0002).
@@ -56,4 +74,5 @@ Not comparable to the authors' L-AP@10 57.06 or L-mAP 51.0: those are average-pr
 
 ## Open issues
 - Why test is so much lower than val: not investigated yet (see above). Options: look at the worst clips' frames (74, 17, 18, 35, 69), or train our own model.
-- Whether the team wants a numeric F1 target.
+- Count error per density bin and lighting tags: protocol in 0005, not run yet (waiting for lighting tags).
+- The threshold is closed at 0.2. The 0.05 test run is a diagnostic only; nothing was selected from it.
