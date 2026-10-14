@@ -106,6 +106,9 @@ number, unique within the clip, and never reused for a different person. Optiona
 
    You do not have to write clip.json yourself; just tell Mahid the details.
 
+   The video must be H.264 (yuv420p) or browsers will not play it. Most downloaded or phone
+   videos already are; OpenCV's default "mp4v" writer is not.
+
 ## Check your file before sending it
 
 Save the script at the bottom of this file as check_layer.py (it needs only Python 3, no
