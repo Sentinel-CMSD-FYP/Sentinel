@@ -43,6 +43,10 @@ layers/<layer>.json       one file per layer            (schemas/layer_<type>.sc
 video.mp4                 the footage
 ```
 
+`video.mp4` must be **H.264 (AVC) with yuv420p pixels**, because browsers cannot play anything else.
+OpenCV's default `mp4v` writer produces MPEG-4 Part 2, which fails in the browser with "no supported
+streams"; re-encode with ffmpeg (`-c:v libx264 -pix_fmt yuv420p -movflags +faststart`).
+
 `clip.json` lists the layers, their type, label, units and a `style` hint (for example
 `{"render": "arrows"}` or `{"render": "heatmap", "field": "density"}`). The `layer` name must equal the
 file name.
@@ -97,7 +101,7 @@ layer file is declared in `clip.json` with the right type. The ingestion endpoin
 `validate_layer`.
 
 ```
-pip install jsonschema numpy opencv-python-headless
+pip install jsonschema numpy opencv-python-headless imageio-ffmpeg
 python docs/layers/make_sample_clip.py data/samples/demo_fake   # fake clip, validated on write
 python docs/layers/validate.py data/samples/demo_fake           # validate any clip folder
 ```
