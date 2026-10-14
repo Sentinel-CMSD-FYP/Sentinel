@@ -13,6 +13,8 @@ The flow layer deliberately has a gap (no samples for frames 100-149) to exercis
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -44,12 +46,15 @@ def simulate(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
     ])
     pos = np.empty((N_FRAMES, len(pos0), 2))
     vels = np.empty_like(pos)
-    p = pos0.copy()
+    p, v = pos0.copy(), vel.copy()
     for t in range(N_FRAMES):
-        pos[t], vels[t] = p, vel
-        p = p + vel
-        p[:, 0] %= W  # wrap so the crowd stays in view
-        p[:, 1] = np.clip(p[:, 1], 0, H - 1)
+        pos[t], vels[t] = p, v
+        p = p + v
+        # Bounce off the edges so the crowd stays in view and tracks never jump across it.
+        for axis, size in ((0, W), (1, H)):
+            out = (p[:, axis] < 0) | (p[:, axis] > size - 1)
+            v[out, axis] *= -1
+            p[:, axis] = np.clip(p[:, axis], 0, size - 1)
     return pos, vels
 
 
@@ -137,6 +142,33 @@ def render_video(path: Path, pos: np.ndarray) -> None:
     out.release()
 
 
+def find_ffmpeg() -> str | None:
+    """ffmpeg on PATH, else the binary bundled with the imageio-ffmpeg package."""
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return None
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def make_browser_playable(path: Path) -> bool:
+    """Re-encode to H.264 in place. OpenCV's mp4v is MPEG-4 Part 2, which browsers cannot play."""
+    ffmpeg = find_ffmpeg()
+    if ffmpeg is None:
+        return False
+    tmp = path.with_name("video_h264.mp4")
+    subprocess.run(
+        [ffmpeg, "-y", "-loglevel", "error", "-i", str(path), "-c:v", "libx264",
+         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(tmp)],
+        check=True,
+    )
+    tmp.replace(path)
+    return True
+
+
 def main() -> None:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/samples/demo_fake")
     (root / "layers").mkdir(parents=True, exist_ok=True)
@@ -168,8 +200,12 @@ def main() -> None:
     }
     (root / "clip.json").write_text(json.dumps(clip, indent=2), encoding="utf-8")
     render_video(root / "video.mp4", pos)
+    playable = make_browser_playable(root / "video.mp4")
 
     print(f"wrote {root}")
+    if not playable:
+        print("  WARNING: no ffmpeg found, so video.mp4 is MPEG-4 Part 2 and will NOT play in a "
+              "browser. Run `pip install imageio-ffmpeg` and generate again.")
     bad = False
     for name, errs in validate_clip_dir(root).items():
         print(f"  {'ok  ' if not errs else 'FAIL'} {name}")
