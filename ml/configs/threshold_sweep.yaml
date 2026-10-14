@@ -1,0 +1,7 @@
+# Config for eval/threshold_sweep.py (B-4). Paths are relative to the repo root.
+data_config: ml/configs/dronecrowd_data.yaml
+split: val                          # tune on val only; test takes one fixed threshold
+pred_dir: data/outputs/points/val   # *_points.json from sentinel_ml.localization.infer
+radius_px: 10.0                     # match radius, original-frame pixels
+thresholds: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+out_dir: data/outputs/b4            # results go to <out_dir>/<split>/
