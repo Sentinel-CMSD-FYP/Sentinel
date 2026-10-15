@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import time
-from collections.abc import Iterator
 from itertools import islice
 from pathlib import Path
 
@@ -20,6 +19,7 @@ import cv2
 import numpy as np
 
 from sentinel_ml.flow.farneback import FarnebackConfig, FarnebackFlow, FlowField, pool_regions
+from sentinel_ml.flow.sources import open_frames
 
 
 def colour_overlay(frame: np.ndarray, flow: FlowField, max_speed: float) -> np.ndarray:
@@ -44,33 +44,6 @@ def draw_arrows(img: np.ndarray, flow: FlowField, rows: int, cols: int, gain: fl
             x, y = int((c + 0.5) * w / cols), int((r + 0.5) * h / rows)
             tip = (int(x + s.mean_u[r, c] * gain), int(y + s.mean_v[r, c] * gain))
             cv2.arrowedLine(img, (x, y), tip, (255, 255, 255), 2, tipLength=0.3)
-
-
-def open_frames(
-    path: Path, seq: str | None, fps: float | None
-) -> tuple[Iterator[np.ndarray], float, tuple[int, int]]:
-    """Frames from an mp4, or from a folder of ``img<seq><frame>.jpg`` (DroneCrowd layout)."""
-    if path.is_dir():
-        files = sorted(path.glob(f"img{seq}*.jpg" if seq else "*.jpg"))
-        if not files:
-            raise SystemExit(f"no jpg frames in {path} (seq={seq})")
-        h, w = cv2.imread(str(files[0])).shape[:2]
-        return (cv2.imread(str(f)) for f in files), fps or 30.0, (w, h)
-
-    cap = cv2.VideoCapture(str(path))
-    if not cap.isOpened():
-        raise SystemExit(f"cannot open {path}")
-    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-
-    def read() -> Iterator[np.ndarray]:
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                cap.release()
-                return
-            yield frame
-
-    return read(), fps or cap.get(cv2.CAP_PROP_FPS) or 30.0, size
 
 
 def main() -> None:
