@@ -16,7 +16,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
-eval = ["matplotlib>=3.8"]  # F1-vs-threshold plot in eval/threshold_sweep.py
+eval = ["matplotlib>=3.8", "scipy>=1.11"]  # eval/ scripts: threshold-sweep plot (matplotlib), DroneCrowd .mat annotations (scipy)
+
 
 [tool.setuptools.packages.find]
 where = ["src"]
