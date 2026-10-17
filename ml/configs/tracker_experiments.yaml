@@ -1,0 +1,15 @@
+# Config for eval/tracker_experiments.py. Grids and the selection rule were fixed BEFORE any
+# experiment ran (docs/project-log.md). Do not change them after seeing results.
+data_config: ml/configs/dronecrowd_data.yaml
+tracker_config: ml/configs/tracker.yaml     # baseline defaults; the experiments override a few keys
+points_dir: data/outputs/points/val         # B's points; the script refuses the test split
+min_len_frames: 45                          # secondary view of the count error
+step1:
+  score_thr: [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50]   # with min_hits 3, max_age 5
+step2:
+  min_hits: [3, 5, 8, 12]                   # cap 12 frames = 0.48 s at 25 fps
+  max_age: [5, 10, 15, 25]                  # cap 25 frames = 1 s at 25 fps
+selection:
+  min_coverage: 0.90                        # mean GT-people coverage must be at least this
+  tie_points: 1.0                           # within this many points of the best counts as tied
+out_dir: data/outputs/tracker_experiments

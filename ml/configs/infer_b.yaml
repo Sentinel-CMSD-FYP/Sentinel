@@ -1,0 +1,20 @@
+# Config for sentinel_ml.localization.infer (B-3). Paths are relative to the repo root.
+data_config: ml/configs/dronecrowd_data.yaml   # root, split manifest, folder layout
+repo_dir: ml/third_party/uav-dot               # DOT + Pixel Distill code (commit a6d3664)
+checkpoint: ml/third_party/uav-dot/checkpoints/dot_pd_dronecrowd_51.00.ckpt
+out_dir: data/outputs/points                   # writes <out_dir>/<split>/<clip_id>_points.json
+
+# Network input, copied from the repo's configs/dronecrowd.yaml.
+net_size: [1920, 1088]        # (w, h). 1080 is STRETCHED to 1088, not padded
+data_mean: [0.38051389, 0.38728308, 0.37517634]
+data_std: [0.23425215, 0.2339074, 0.24194536]
+
+# Lowest score written to disk. The repo's own cut-off is 0.2; B-4 sweeps 0.1-0.9 on
+# validation, so 0.05 keeps everything the sweep needs. Not a tuned value.
+min_score: 0.05
+
+# Written into every file (docs/contracts.md v1.0).
+fps: 25                       # DroneCrowd paper, arXiv 2105.02440 p.3
+frame_stride: 1               # 1 = every frame
+altitude_m: 60.0              # assumed constant; the dataset has no altitude
+altitude_source: assumed_constant
