@@ -16,3 +16,4 @@ tracker:
   r_meas: 1.0
   max_age_s: 3.0
   use_altitude: false
+  use_cmc: false

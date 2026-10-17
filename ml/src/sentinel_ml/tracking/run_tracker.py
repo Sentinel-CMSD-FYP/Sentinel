@@ -25,13 +25,18 @@ HEADER_KEYS = ("schema_version", "clip_id", "frame_size", "fps", "frame_stride",
                "altitude_source")
 
 
-def track_clip(points_doc: dict, cfg: TrackerConfig, altitude_m: float | None = None) -> dict:
+def track_clip(points_doc: dict, cfg: TrackerConfig, altitude_m: float | None = None,
+               camera_shifts: dict[int, tuple[float, float]] | None = None) -> dict:
     """Track one clip. Returns a tracks document in the contract format.
 
     ``cfg`` may use seconds and altitude; they are resolved with the clip's own header
     (fps, frame_stride, altitude_m). ``altitude_m`` overrides the header altitude, for example
-    with the DroneCrowd per-clip proxy when benchmarking.
+    with the DroneCrowd per-clip proxy when benchmarking. ``camera_shifts`` maps a frame_id to
+    the (dx, dy) camera shift (original pixels) from the previous frame to that frame; it is used
+    only when ``cfg.use_cmc`` is on, and frames without an entry get no shift.
     """
+    if cfg.use_cmc and camera_shifts is None:
+        raise ValueError("use_cmc needs camera_shifts (see sentinel_ml.tracking.cmc)")
     w, h = points_doc["frame_size"]
     alt_used = altitude_m if altitude_m is not None else points_doc.get("altitude_m")
     scaled_gate = cfg.use_altitude
@@ -41,8 +46,9 @@ def track_clip(points_doc: dict, cfg: TrackerConfig, altitude_m: float | None = 
     frames: dict[str, list[list[float]]] = {}
     for fid in sorted(points_doc["frames"], key=int):
         pts = np.asarray(points_doc["frames"][fid], dtype=float).reshape(-1, 3)
+        shift = camera_shifts.get(int(fid)) if camera_shifts else None
         frames[fid] = [[tid, round(x, 1), round(y, 1), round(s, 4)]
-                       for tid, x, y, s in tracker.update(pts)]
+                       for tid, x, y, s in tracker.update(pts, shift)]
     doc = {k: points_doc[k] for k in HEADER_KEYS}
     if scaled_gate:  # extra key (readers ignore unknown keys): the altitude the gate really used
         doc["altitude_used_m"] = alt_used

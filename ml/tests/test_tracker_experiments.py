@@ -209,8 +209,34 @@ def test_candidate_config_records_the_altitude_decision(tmp_path):
     tracker = {"score_thr": 0.35, "min_hits": 3, "max_age_s": 3.0}
     base.write_text(yaml.safe_dump({"tracker": tracker}))
     out = tmp_path / "candidate.yaml"
-    te.write_candidate_config(base, True, out)
+    te.write_candidate_config(base, out, use_altitude=True)
     loaded = yaml.safe_load(out.read_text())
     assert loaded["tracker"] == {"score_thr": 0.35, "min_hits": 3, "max_age_s": 3.0,
                                  "use_altitude": True}
     assert "Candidate" in out.read_text()
+
+
+def test_select_toggle_uses_the_given_key_and_matches_the_altitude_rule():
+    off, on = metrics(40.0), metrics(38.0)
+    cmc = te.select_toggle(off, on, 0.88, 0.935, 1.0, "use_cmc")
+    assert cmc["use_cmc"] is True and cmc["gain_points"] == 2.0
+    assert te.select_toggle(off, metrics(39.5), 0.88, 0.935, 1.0, "use_cmc")["use_cmc"] is False
+    assert te.select_altitude(off, on, 0.88, 0.935, 1.0)["use_altitude"] is True
+
+
+def test_cmc_shifts_flow_through_evaluate_config():
+    import numpy as np
+
+    base = [(200.0, 200.0), (500.0, 300.0)]
+    frames, gt = {}, {}
+    for f in range(30):
+        dx = 30.0 if f >= 10 else 0.0  # the whole view jumps 30 px at frame 10
+        frames[str(f)] = [[x + dx, y, 0.9] for x, y in base]
+        gt[f] = (np.array([[x + dx, y] for x, y in base]), np.array([1, 2]))
+    doc, _ = clip(1)
+    doc["frames"] = frames
+    off = te.evaluate_config({1: doc}, {1: gt}, replace(BASE, use_cmc=False), 45)
+    on = te.evaluate_config({1: doc}, {1: gt}, replace(BASE, use_cmc=True), 45, None,
+                            {1: {10: (30.0, 0.0)}})
+    assert off["extra_ids_for_tracked"] == 2 and on["extra_ids_for_tracked"] == 0
+    assert on["mean_err_pct"] < off["mean_err_pct"]

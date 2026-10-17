@@ -221,6 +221,32 @@ provisional and nothing is marked pass or fail.
   point gain and both floors held) altitude scaling stays off. I did not relax the floors a second time.
   It should be re-tested on my own footage with real altitude.
 
+- Altitude scaling stays off by the rule fixed in advance. It is untested on real altitude (the proxy is the
+  authors' object-size stand-in, and only 3 of 10 val clips got a different gate) and should be re-tested on my
+  own footage.
+- CMC interface (built, 177 tests pass, not yet evaluated): a flow field goes in, a camera shift comes out.
+  `FlowInput(u, v, downscale, in_original_pixels)` carries the flow grid's downscale explicitly and says
+  which pixels the vectors are in; `estimate_camera_shift` returns the median flow as (dx, dy) in original
+  pixels (previous to current frame). A flow provider is any callable (prev frame, frame) -> FlowInput, so
+  another flow model can be swapped in; `FarnebackProvider` wraps Mahid's Farneback model (his `FlowField`
+  hides its downscale, so the provider passes it on from his config; carrying it in the object would make the
+  interface self-contained). In the tracker, `use_cmc` (off by default) adds the full shift to the predicted
+  positions after the Kalman prediction and before the border check; velocity and covariance are untouched.
+  Tests cover units, robustness to moving people, the sign convention end to end through Farneback, and a
+  30 px camera jump that breaks tracks without CMC and not with it.
+- E-2b protocol (fixed before computing any val shift): Farneback with Mahid's default config (downscale 0.25),
+  median shift over the whole grid, no exclusion mask; candidate config (score 0.35, min_hits 3, max_age 3.0 s,
+  altitude off) with CMC off against on; on only if the primary count error improves by at least 1.0 point and
+  coverage >= 0.88 and purity >= 0.935 hold. Expectation stated in advance: a small effect, since camera
+  motion is small on all 30 test clips. The val frames are on the USB drive, which has to be plugged in.
+
+- E-2b result on val (10 clips, B trained on these clips): camera shifts from Mahid's Farneback (default config)
+  are tiny (per-clip median 0.02 to 0.06 px per frame, largest 0.39 px). CMC on gives 40.44% against 40.39% off,
+  a gain of -0.06 points (the rule needs +1.0), with the floors held; the filtered view is 12.68% against 11.62%.
+  By the rule fixed in advance CMC stays off, as I expected beforehand: the footage barely moves. The mechanism
+  itself works (a 30 px camera jump is handled in a test), so the code stays, off by default, to be re-tested on
+  my own footage. Candidate config after E-2: score 0.35, min_hits 3, max_age 3.0 s, altitude off, CMC off.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.

@@ -25,4 +25,10 @@ step4:
   min_gain_points: 1.0
 tracker_config_step4: ml/configs/tracker_selected_e2.yaml
 size_tags: data/manifests/object_size_tags.yaml
+step5:
+  # camera-motion compensation off vs on (Mahid's Farneback, default config, median shift); on only
+  # if the primary error improves by at least this many points and the step-3 floors hold
+  min_gain_points: 1.0
+tracker_config_step5: ml/configs/tracker_e2_candidate.yaml
+shifts_dir: data/outputs/camera_shifts/val   # written by eval/compute_camera_shifts.py
 out_dir: data/outputs/tracker_experiments

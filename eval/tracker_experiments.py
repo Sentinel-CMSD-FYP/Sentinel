@@ -32,6 +32,7 @@ import yaml
 from sentinel_ml.localization import data as D
 from sentinel_ml.tracking import TrackerConfig
 from sentinel_ml.tracking.altitude import altitude_from_size_tags, load_size_tags
+from sentinel_ml.tracking.cmc import load_shifts
 from sentinel_ml.tracking.run_tracker import track_clip
 from sentinel_ml.tracking.tracker import resolve_config
 
@@ -39,14 +40,17 @@ B_THRESHOLD = 0.20  # the score threshold chosen for B on val (docs/project-log.
 
 
 def evaluate_config(points_docs: dict[int, dict], gt_by_clip: dict[int, dict], cfg: TrackerConfig,
-                    min_len: int, altitude_by_clip: dict[int, float] | None = None) -> dict:
+                    min_len: int, altitude_by_clip: dict[int, float] | None = None,
+                    shifts_by_clip: dict[int, dict] | None = None) -> dict:
     """Run the tracker with ``cfg`` on every clip and score it. Means are over clips.
 
-    ``altitude_by_clip`` overrides each clip's header altitude (the DroneCrowd size proxy).
+    ``altitude_by_clip`` overrides each clip's header altitude (the DroneCrowd size proxy);
+    ``shifts_by_clip`` gives each clip's per-frame camera shifts (used when ``cfg.use_cmc``).
     """
     rows, coverage, purity, spurious, extra = [], [], [], 0, 0
     for clip, doc in sorted(points_docs.items()):
-        tracks_doc = track_clip(doc, cfg, altitude_by_clip.get(clip) if altitude_by_clip else None)
+        tracks_doc = track_clip(doc, cfg, altitude_by_clip.get(clip) if altitude_by_clip else None,
+                                shifts_by_clip.get(clip) if shifts_by_clip else None)
         gt = gt_by_clip[clip]
         row = tc.clip_row(clip, tracks_doc, gt, min_len)
         outputs = {int(k): v for k, v in tracks_doc["frames"].items()}
@@ -86,13 +90,19 @@ def select(results: list[dict], min_coverage: float, tie_points: float, step: in
     return min(tied, key=lambda r: (r["min_hits"], r["max_age"]))
 
 
-def select_altitude(off: dict, on: dict, min_coverage: float, min_purity: float,
-                    min_gain: float) -> dict:
-    """Turn altitude scaling on only if it gains ``min_gain`` points and keeps both floors."""
+def select_toggle(off: dict, on: dict, min_coverage: float, min_purity: float, min_gain: float,
+                  key: str) -> dict:
+    """Turn a feature on only if it gains ``min_gain`` points and keeps both floors."""
     gain = off["mean_err_pct"] - on["mean_err_pct"]
     floors_ok = on["mean_coverage"] >= min_coverage and on["mean_purity"] >= min_purity
-    return {"use_altitude": bool(gain >= min_gain and floors_ok), "gain_points": gain,
+    return {key: bool(gain >= min_gain and floors_ok), "gain_points": gain,
             "floors_ok": floors_ok}
+
+
+def select_altitude(off: dict, on: dict, min_coverage: float, min_purity: float,
+                    min_gain: float) -> dict:
+    """The altitude-scaling decision (step 4)."""
+    return select_toggle(off, on, min_coverage, min_purity, min_gain, "use_altitude")
 
 
 def floors_for_step(sel: dict, step: int) -> tuple[float, float | None]:
@@ -172,10 +182,10 @@ def load_val_inputs(cfg: dict) -> tuple[dict, dict]:
     return docs, gts
 
 
-def write_candidate_config(base_path: Path, use_altitude: bool, out_path: Path) -> None:
-    """Copy the step-3 config with the altitude decision (the baseline files are untouched)."""
+def write_candidate_config(base_path: Path, out_path: Path, **tracker_updates) -> None:
+    """Copy a tracker config with the decided values (the base files are untouched)."""
     cfg = yaml.safe_load(base_path.read_text())
-    cfg["tracker"]["use_altitude"] = use_altitude
+    cfg["tracker"].update(tracker_updates)
     header = ("# Candidate E-2 config, fixed on val (docs/project-log.md). use_altitude follows the\n"
               "# step-4 rule. Not final until the CMC and IDF1 decisions are made; frozen once scored\n"
               "# on test. B's val points are optimistic.\n")
@@ -210,15 +220,52 @@ def run_altitude_step(cfg: dict, write_selected: Path | None) -> None:
          "note": "val only; B trained on these clips; only the size-tagged large clips get a "
                  "different gate"}, indent=1) + "\n")
     if write_selected:
-        write_candidate_config(Path(cfg["tracker_config_step4"]), decision["use_altitude"],
-                               write_selected)
+        write_candidate_config(Path(cfg["tracker_config_step4"]), write_selected,
+                               use_altitude=decision["use_altitude"])
+        print(f"wrote {write_selected}")
+
+
+def run_cmc_step(cfg: dict, write_selected: Path | None) -> None:
+    """Step 5: camera-motion compensation off vs on, val only, from saved per-frame shifts."""
+    base = TrackerConfig(**yaml.safe_load(
+        Path(cfg["tracker_config_step5"]).read_text())["tracker"])
+    docs, gts = load_val_inputs(cfg)
+    shifts_dir = Path(cfg["shifts_dir"])
+    shifts = {}
+    for clip in docs:
+        path = shifts_dir / f"clip_{clip:03d}_shifts.json"
+        if not path.exists():
+            raise SystemExit(f"missing {path}: run eval/compute_camera_shifts.py --split val first")
+        shifts[clip] = load_shifts(json.loads(path.read_text()))
+    min_len = int(cfg["min_len_frames"])
+    off = evaluate_config(docs, gts, replace(base, use_cmc=False), min_len)
+    on = evaluate_config(docs, gts, replace(base, use_cmc=True), min_len, None, shifts)
+    min_cov, min_pur = floors_for_step(cfg["selection"], 3)
+    decision = select_toggle(off, on, min_cov, min_pur, float(cfg["step5"]["min_gain_points"]),
+                             "use_cmc")
+    for name, r in (("cmc off", off), ("cmc on (Farneback median)", on)):
+        print(f"{name:26s} err {r['mean_err_pct']:6.2f}%  filtered {r['mean_err_pct_min_len']:5.2f}%  "
+              f"ids/person {r['ids_per_person']:.2f}  coverage {r['mean_coverage']:.4f}  "
+              f"purity {r['mean_purity']:.4f}  spurious {r['spurious_ids']}  extra "
+              f"{r['extra_ids_for_tracked']}")
+    print(f"gain {decision['gain_points']:+.2f} points (needs >= {cfg['step5']['min_gain_points']}), "
+          f"floors ok: {decision['floors_ok']} -> use_cmc = {decision['use_cmc']}")
+    out_dir = Path(cfg["out_dir"]) / "step5"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "results.json").write_text(json.dumps(
+        {"split": "val", "off": off, "on": on, "decision": decision,
+         "note": "val only; B trained on these clips; camera motion is small in these clips"},
+        indent=1) + chr(10))
+    if write_selected:
+        write_candidate_config(Path(cfg["tracker_config_step5"]), write_selected,
+                               use_cmc=decision["use_cmc"])
         print(f"wrote {write_selected}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--config", type=Path, required=True)
-    ap.add_argument("--step", type=int, choices=[1, 2, 3, 4], required=True)
+    ap.add_argument("--step", type=int, choices=[1, 2, 3, 4, 5], required=True)
     ap.add_argument("--score-thr", type=float, help="step 2: override the step-1 selection")
     ap.add_argument("--write-selected", type=Path, help="write the chosen config to this yaml")
     args = ap.parse_args()
@@ -227,6 +274,9 @@ def main() -> None:
     check_val_only(Path(cfg["points_dir"]))
     if args.step == 4:
         run_altitude_step(cfg, args.write_selected)
+        return
+    if args.step == 5:
+        run_cmc_step(cfg, args.write_selected)
         return
     base = TrackerConfig(**yaml.safe_load(Path(cfg["tracker_config"]).read_text())["tracker"])
     out_dir = Path(cfg["out_dir"]) / f"step{args.step}"

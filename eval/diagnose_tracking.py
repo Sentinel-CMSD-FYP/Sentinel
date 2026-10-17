@@ -66,9 +66,9 @@ def recording():
         cur["frame"] += 1
         return orig_update(self, points)
 
-    def predict(self, frame_size):
+    def predict(self, frame_size, camera_shift=None):
         before = self.state
-        orig_predict(self, frame_size)
+        orig_predict(self, frame_size, camera_shift)
         if before is not T.State.DEAD and self.state is T.State.DEAD:
             records[self.id]["death"] = ("border", cur["frame"])
 

@@ -47,6 +47,8 @@ class TrackerConfig:
     ref_altitude_m: altitude at which the gate equals ``size_px`` (the authors use 100 m).
     max_age_s: if set, the miss limit in seconds; it replaces ``max_age`` (frames) once the
         clip's fps and frame_stride are known. ``resolve_config`` does the conversion.
+    use_cmc: apply the per-frame camera shifts passed to ``PointTracker.update`` (the full
+        translation, in original pixels) to the predicted track positions. Off by default.
 
     A config with ``use_altitude`` or ``max_age_s`` is "unresolved": pass it through
     :func:`resolve_config` (``run_tracker.track_clip`` does) before building a tracker.
@@ -60,6 +62,7 @@ class TrackerConfig:
     use_altitude: bool = False
     ref_altitude_m: float = 100.0
     max_age_s: float | None = None
+    use_cmc: bool = False
     p_pos: float = 10.0
     p_vel: float = 10000.0
     q_pos: float = 1.0
@@ -108,9 +111,17 @@ class Track:
     def xy(self) -> tuple[float, float]:
         return self.kf.xy
 
-    def predict(self, frame_size: tuple[int, int]) -> None:
-        """Move the filter one frame ahead; mark the track dead if it leaves the frame."""
-        x, y = self.kf.predict()
+    def predict(self, frame_size: tuple[int, int],
+                camera_shift: tuple[float, float] | None = None) -> None:
+        """Move the filter one frame ahead, then apply the camera shift, if any.
+
+        The track is marked dead if the shifted prediction leaves the frame or comes closer
+        than ``border_margin_px`` to its border.
+        """
+        self.kf.predict()
+        if camera_shift is not None:
+            self.kf.shift(camera_shift[0], camera_shift[1])
+        x, y = self.kf.xy
         m = self.cfg.border_margin_px
         w, h = frame_size
         if x - m < 0 or y - m < 0 or x + m >= w or y + m >= h:
@@ -164,11 +175,14 @@ class PointTracker:
         dist = np.linalg.norm(dets[:, None, :] - trks[None, :, :], axis=-1)
         return 1.0 - np.minimum(dist, gate) / gate
 
-    def update(self, points: np.ndarray) -> list[tuple[int, float, float, float]]:
+    def update(self, points: np.ndarray, camera_shift: tuple[float, float] | None = None
+               ) -> list[tuple[int, float, float, float]]:
         """Process one frame.
 
         Args:
             points: (N, 3) array of (x, y, score), pixels and score in [0, 1]. May be empty.
+            camera_shift: (dx, dy) in original pixels, how far a static point moved in the image
+                since the previous frame. Used only if ``cfg.use_cmc``; ``None`` means no shift.
 
         Returns:
             Rows (track_id, x, y, score) of the confirmed tracks matched in this frame,
@@ -185,8 +199,9 @@ class PointTracker:
             self._initialized = True
             return [(t.id, t.xy[0], t.xy[1], t.score) for t in self.tracks]
 
+        shift = camera_shift if self.cfg.use_cmc else None
         for t in self.tracks:
-            t.predict(self.frame_size)
+            t.predict(self.frame_size, shift)
         self.tracks = [t for t in self.tracks if t.state is not State.DEAD]
 
         matches: list[tuple[int, int]] = []
