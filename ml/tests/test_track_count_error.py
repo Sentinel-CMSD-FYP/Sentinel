@@ -109,6 +109,16 @@ def test_test_split_is_refused_when_results_already_exist(tmp_path, monkeypatch)
     done.mkdir(parents=True)
     (done / "track_count_error.json").write_text("{}")
     monkeypatch.setattr(sys, "argv", ["track_count_error.py", "--config", str(cfg_path),
-                                      "--split", "test"])
+                                      "--split", "test",
+                                      "--tracker-config", "unused.yaml"])
     with pytest.raises(SystemExit, match="once"):
         tc.main()
+
+
+def test_label_comes_from_the_tracker_config_including_cmc_and_altitude_status():
+    base = {"score_thr": 0.35, "min_hits": 3, "max_age": 25}
+    label = tc.describe_tracker(base)
+    assert "score_thr 0.35" in label and "min_hits 3" in label and "max_age 25" in label
+    assert "no CMC" in label and "no altitude scaling" in label
+    on = tc.describe_tracker({**base, "use_cmc": True, "use_altitude": True})
+    assert "CMC on" in on and "altitude-scaled gate" in on and "no CMC" not in on

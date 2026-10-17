@@ -12,5 +12,5 @@ Download datasets here (VisDrone, DroneCrowd, etc.).
   - `test_data-001/test_data/{images,ground_truth}` (9,000 files each)
   - `val_data/val_data/{images,ground_truth}` (360 files each)
   - `annotations/annotations/` (`.xml` and `.mat` per sequence, some `_clean.txt`)
-  - `trainlist.txt` (81 lines), `testlist.txt` (29 lines)
-- Dataset README says: the val set is sampled from the test set. See `docs/decisions/0002-dataset-notes.md` once P0-3 is done.
+  - `trainlist.txt` (82 clips), `testlist.txt` (30 clips)
+- Dataset README says: the val set is sampled from the test set. See `docs/project-log.md`.

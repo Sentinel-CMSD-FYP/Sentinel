@@ -73,6 +73,14 @@ def summarise(rows: list[dict], tags: dict[int, str] | None) -> dict:
     return result
 
 
+def describe_tracker(tracker_cfg: dict) -> str:
+    """Label of the tracker settings, read from the config that produced the tracks."""
+    cmc = "CMC on" if tracker_cfg.get("use_cmc") else "no CMC"
+    alt = "altitude-scaled gate" if tracker_cfg.get("use_altitude") else "no altitude scaling"
+    return (f"tracker on B points (score_thr {tracker_cfg['score_thr']}, min_hits "
+            f"{tracker_cfg['min_hits']}, max_age {tracker_cfg['max_age']}), {cmc}, {alt}")
+
+
 def load_tags(path: Path, split: str) -> dict[int, str] | None:
     """{clip: tag} for ``split``, or None if the file is missing or not fully filled in."""
     if not Path(path).exists():
@@ -129,10 +137,13 @@ def main() -> None:
     ap.add_argument("--config", type=Path, required=True)
     ap.add_argument("--split", required=True, choices=["val", "test"])
     ap.add_argument("--tracks-dir", type=Path, help="default: <tracks_dir>/<split>")
+    ap.add_argument("--tracker-config", type=Path, required=True,
+                    help="the tracker yaml that produced the tracks (used for the label)")
+    ap.add_argument("--out-dir", type=Path, help="default: <out_dir>/<split>")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(args.config.read_text())
-    out_dir = Path(cfg["out_dir"]) / args.split
+    out_dir = args.out_dir or Path(cfg["out_dir"]) / args.split
     if args.split == "test" and (out_dir / "track_count_error.json").exists():
         raise SystemExit(f"{out_dir / 'track_count_error.json'} exists: the test split is "
                          "scored once. Delete the file only if the run was invalid.")
@@ -149,11 +160,13 @@ def main() -> None:
         rows.append(clip_row(clip, doc, gt, int(cfg["min_len_frames"])))
     tags = load_tags(Path(cfg["lighting_tags"]), args.split)
     summary = summarise(rows, tags)
-    label = (f"DroneCrowd {args.split} split, {len(rows)} clips, tracker on B points at "
-             f"score >= {cfg.get('score_thr_note', '0.2')}")
+    tracker_cfg = yaml.safe_load(args.tracker_config.read_text())["tracker"]
+    label = (f"DroneCrowd {args.split} split, {len(rows)} clips, {describe_tracker(tracker_cfg)}, "
+             "DroneCrowd only")
     print(label)
     print(format_report(rows, summary, float(cfg["provisional_target_pct"])))
-    meta = {"label": label, "split": args.split, "min_len_frames": cfg["min_len_frames"],
+    meta = {"label": label, "split": args.split, "tracker": tracker_cfg,
+            "min_len_frames": cfg["min_len_frames"],
             "tags_used": tags is not None,
             "target_note": "provisional, unsigned draft Phase 0 sheet, not pass/fail"}
     for p in write_outputs(rows, summary, meta, out_dir):

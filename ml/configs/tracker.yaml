@@ -7,7 +7,7 @@ out_dir: data/outputs/tracks      # writes <out_dir>/<split>/clip_XXX_tracks.jso
 tracker:
   max_age: 5        # a track dies after more than this many consecutive missed frames
   min_hits: 3       # consecutive hits needed to confirm a new track
-  score_thr: 0.2    # B's threshold chosen on val (decision 0004)
+  score_thr: 0.2    # B's threshold chosen on val (docs/project-log.md)
   size_px: 20       # matching gate in pixels (no altitude scaling in E-1)
   border_margin_px: 10  # tracks predicted closer than this to the frame border are killed
   p_pos: 10.0

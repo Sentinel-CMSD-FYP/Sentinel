@@ -33,7 +33,7 @@ from sentinel_ml.localization import data as D
 # x/y in original pixels and score in [0, 1].
 Detector = Callable[[np.ndarray], np.ndarray]
 
-# Types the released DOT checkpoint stores (found by listing its pickle globals, 0003).
+# Types the released DOT checkpoint stores (found by listing its pickle globals).
 # Anything else is refused when the checkpoint is loaded.
 ALLOWED_PICKLE_GLOBALS = {
     ("collections", "defaultdict"), ("collections", "OrderedDict"),

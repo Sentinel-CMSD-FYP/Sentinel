@@ -1,6 +1,6 @@
 """DroneCrowd data loader for Model B (and later E).
 
-Splits used by this project (decision 0002):
+Splits used by this project (docs/project-log.md):
   * ``test``  = the official test clips (30). Used only for final numbers.
   * ``val``   = ``n_val`` clips held out from the official train clips, chosen with a
                 fixed seed and frozen in a manifest. The dataset's own ``val_data``
@@ -93,7 +93,7 @@ def build_manifest(official_train: list[int], official_test: list[int], n_val: i
     return {
         "dataset": "DroneCrowd",
         "note": "val is held out from the official train clips; the official val_data "
-                "folder is a copy of test frames and is not used (decision 0002)",
+                "folder is a copy of test frames and is not used (docs/project-log.md)",
         "seed": seed,
         "n_val": n_val,
         "train": sorted(set(official_train) - set(val)),

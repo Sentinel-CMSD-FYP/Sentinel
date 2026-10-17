@@ -125,3 +125,32 @@ def test_recording_does_not_change_the_tracker_output():
     for f in range(20):
         rows = plain.update(np.array(doc["frames"][str(f)], float).reshape(-1, 3))
         assert rows == recorded[f]
+
+
+def test_camera_translation_estimates_a_known_shift(tmp_path):
+    import cv2
+
+    rng = np.random.default_rng(0)
+    base = cv2.GaussianBlur(rng.uniform(0, 255, (400, 700)).astype(np.float32), (0, 0), 2.0)
+    paths = []
+    for k in range(8):  # the view moves 4 px right and 3 px down per frame -> 5 px translation
+        crop = base[3 * k:3 * k + 270, 4 * k:4 * k + 480].astype(np.uint8)
+        path = tmp_path / f"f{k}.png"
+        cv2.imwrite(str(path), cv2.merge([crop, crop, crop]))
+        paths.append(path)
+    est = dg.camera_translation(paths)
+    assert est["frames_pairs"] == 7
+    assert abs(est["median_px"] - 5.0) < 0.6
+
+
+def test_camera_translation_of_a_still_camera_is_about_zero(tmp_path):
+    import cv2
+
+    rng = np.random.default_rng(1)
+    base = cv2.GaussianBlur(rng.uniform(0, 255, (270, 480)).astype(np.float32), (0, 0), 2.0)
+    paths = []
+    for k in range(5):
+        path = tmp_path / f"s{k}.png"
+        cv2.imwrite(str(path), cv2.merge([base.astype(np.uint8)] * 3))
+        paths.append(path)
+    assert dg.camera_translation(paths)["max_px"] < 0.2

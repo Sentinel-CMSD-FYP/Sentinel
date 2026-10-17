@@ -2,7 +2,8 @@
 
 Each confirmed track is drawn as a dot at its current position plus a trail of its last
 ``--trail`` positions, in one colour per id. A steady colour on a person means a stable id;
-a colour that keeps changing on the same person means id switches.
+a colour that keeps changing on the same person means id switches. A track that is not
+output in a frame (ended or missing) is not drawn in that frame.
 
 Units: pixels. Coordinates: (x, y) = (column, row), original frame pixels.
 
@@ -32,15 +33,18 @@ def id_color(track_id: int) -> tuple[int, int, int]:
 
 def draw_frame(image_bgr: np.ndarray, rows: list[list[float]],
                history: dict[int, deque]) -> np.ndarray:
-    """Draw trails and current dots for the track rows of one frame; updates ``history``."""
+    """Draw trails and current dots for the track rows of one frame; updates ``history``.
+
+    Only ids that appear in ``rows`` are drawn, so the trail of a track that has ended or is
+    missing in this frame disappears together with its dot.
+    """
     out = image_bgr.copy()
     for tid, x, y, _ in rows:
         history[int(tid)].append((round(x), round(y)))
-    for tid, trail in history.items():
-        color = id_color(tid)
-        pts = list(trail)
+    for tid, *_ in rows:
+        pts = list(history[int(tid)])
         for a, b in zip(pts[:-1], pts[1:], strict=False):
-            cv2.line(out, a, b, color, 2, cv2.LINE_AA)
+            cv2.line(out, a, b, id_color(int(tid)), 2, cv2.LINE_AA)
     for tid, x, y, _ in rows:
         cv2.circle(out, (round(x), round(y)), 6, id_color(int(tid)), -1, cv2.LINE_AA)
         cv2.circle(out, (round(x), round(y)), 6, (0, 0, 0), 1, cv2.LINE_AA)
