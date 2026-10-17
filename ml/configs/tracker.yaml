@@ -1,0 +1,17 @@
+# Config for sentinel_ml.tracking.run_tracker (E-1). Paths are relative to the repo root.
+points_dir: data/outputs/points   # <points_dir>/<split>/clip_XXX_points.json from Model B
+out_dir: data/outputs/tracks      # writes <out_dir>/<split>/clip_XXX_tracks.json
+
+# Baseline settings. Noise values are the authors' defaults (uav-dot-track, no DDCF); none
+# of them were tuned by us.
+tracker:
+  max_age: 5        # a track dies after more than this many consecutive missed frames
+  min_hits: 3       # consecutive hits needed to confirm a new track
+  score_thr: 0.2    # B's threshold chosen on val (decision 0004)
+  size_px: 20       # matching gate in pixels (no altitude scaling in E-1)
+  border_margin_px: 10  # tracks predicted closer than this to the frame border are killed
+  p_pos: 10.0
+  p_vel: 10000.0
+  q_pos: 1.0
+  q_vel: 0.5
+  r_meas: 1.0
