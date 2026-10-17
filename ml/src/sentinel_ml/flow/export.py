@@ -28,6 +28,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from sentinel_ml.geometry import NadirCamera
+
 from .camera import remove_camera_motion
 from .farneback import FarnebackConfig, FarnebackFlow, pool_regions
 from .sources import open_frames
@@ -53,6 +55,11 @@ class ExportConfig:
     # Keep only cells whose centre is in the middle `centre_fraction` of the frame (1.0 = all).
     # Other cells are marked invalid. Useful where the fit is weakest, at the edges of a zoom.
     centre_fraction: float = 1.0
+    # With both set, flow is written in metres per second instead of pixels per frame, using
+    # the ground sampling distance of a straight-down camera (see sentinel_ml.geometry). Neither
+    # is known for DroneCrowd or YouTube clips, so these are assumptions the caller owns.
+    altitude_m: float | None = None
+    hfov_deg: float | None = None
 
     def __post_init__(self) -> None:
         if self.rows < 1 or self.cols < 1:
@@ -65,6 +72,10 @@ class ExportConfig:
             raise ValueError("centre_fraction must be in (0, 1]")
         if not 0.0 <= self.min_inliers <= 1.0:
             raise ValueError("min_inliers must be in [0, 1]")
+        if (self.altitude_m is None) != (self.hfov_deg is None):
+            raise ValueError("altitude_m and hfov_deg must be given together")
+        if self.altitude_m is not None:
+            NadirCamera(self.altitude_m, self.hfov_deg, 1)  # validates the ranges
 
 
 def centre_mask(rows: int, cols: int, fraction: float) -> np.ndarray:
@@ -158,6 +169,12 @@ def export_flow(
     speeds: list[float] = []
     speeds_raw: list[float] = []
     inside = centre_mask(cfg.rows, cfg.cols, cfg.centre_fraction)
+    # Ground sampling distance is for the pixels flow is measured in: the written video, after
+    # any shrinking, which keeps the field of view.
+    metric = cfg.altitude_m is not None
+    gsd_m = NadirCamera(cfg.altitude_m, cfg.hfov_deg, width).gsd if metric else None
+    to_units = gsd_m * src_fps if metric else 1.0  # px per frame -> m/s (or unchanged)
+    units = "m_per_s" if metric else "px_per_frame"
     n = 0
 
     for idx, frame in enumerate(frames):
@@ -191,9 +208,9 @@ def export_flow(
         valid &= inside
         samples[at] = {
             "valid": valid.astype(int).tolist(),
-            "u": np.round(pooled.mean_u * k, 3).tolist(),
-            "v": np.round(pooled.mean_v * k, 3).tolist(),
-            "speed": np.round(pooled.mean_speed * k, 3).tolist(),
+            "u": np.round(pooled.mean_u * k * to_units, 4).tolist(),
+            "v": np.round(pooled.mean_v * k * to_units, 4).tolist(),
+            "speed": np.round(pooled.mean_speed * k * to_units, 4).tolist(),
         }
         speeds.append(float(pooled.mean_speed[valid].mean() * k) if valid.any() else 0.0)
 
@@ -205,7 +222,7 @@ def export_flow(
     layer = {
         "schema_version": 1, "clip_id": clip_id, "layer": "flow", "type": "grid",
         "frame_size": [width, height], "grid": {"rows": cfg.rows, "cols": cfg.cols},
-        "units": "px_per_frame", "fields": ["u", "v", "speed"], "max_age_frames": every,
+        "units": units, "fields": ["u", "v", "speed"], "max_age_frames": every,
         "frames": samples,
     }
     clip = {
@@ -213,7 +230,7 @@ def export_flow(
         "frame_size": [width, height], "n_frames": n,
         "video_url": f"/api/v1/clips/{clip_id}/video",
         "layers": [{
-            "layer": "flow", "type": "grid", "label": "Optical flow", "units": "px_per_frame",
+            "layer": "flow", "type": "grid", "label": "Optical flow", "units": units,
             "default_visible": True, "style": {"render": "arrows", "u": "u", "v": "v"},
         }],
         "produced_by": {
@@ -221,6 +238,9 @@ def export_flow(
             "gap_frames": cfg.gap, "every_frames": every, "min_texture": cfg.min_texture,
             "stabilise": cfg.stabilise, "min_inliers": cfg.min_inliers,
             "centre_fraction": cfg.centre_fraction,
+            # Assumptions, not measurements, unless the caller knows the real camera.
+            "altitude_m": cfg.altitude_m, "hfov_deg": cfg.hfov_deg,
+            "ground_sampling_m_per_px": gsd_m,
         },
     }
     (out / "layers" / "flow.json").write_text(json.dumps(layer), encoding="utf-8")
@@ -239,6 +259,7 @@ def export_flow(
         "valid_cell_fraction": float(np.mean(valid_share)) if valid_share else 0.0,
         "mean_speed_px_per_frame": float(np.mean(speeds)) if speeds else 0.0,
         "mean_speed_before_px_per_frame": float(np.mean(speeds_raw)) if speeds_raw else None,
+        "units": units, "gsd_m_per_px": gsd_m,
         "camera_samples_dropped": sum(1 for c in camera.values() if not c["used"]),
         "mean_zoom_percent_per_s": (
             float(np.mean([c["zoom_percent_per_s"] for c in camera.values()])) if camera else None
@@ -269,6 +290,9 @@ def main(argv: list[str] | None = None) -> None:
                     help="drop a sample when less of the frame than this agrees on camera motion")
     ap.add_argument("--centre-fraction", type=float, default=1.0,
                     help="only keep cells in the middle fraction of the frame, e.g. 0.6")
+    ap.add_argument("--altitude", type=float, help="camera height in metres; with --hfov, "
+                    "flow is written in m/s (a straight-down camera over flat ground is assumed)")
+    ap.add_argument("--hfov", type=float, help="horizontal field of view in degrees")
     ap.add_argument("--max-width", type=int, default=1920)
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--max-frames", type=int)
@@ -279,7 +303,8 @@ def main(argv: list[str] | None = None) -> None:
     cfg = ExportConfig(rows=a.rows, cols=a.cols, every=a.every, gap=a.gap,
                        min_texture=a.min_texture, max_width=a.max_width, start=a.start,
                        max_frames=a.max_frames, stabilise=a.stabilise,
-                       min_inliers=a.min_inliers, centre_fraction=a.centre_fraction)
+                       min_inliers=a.min_inliers, centre_fraction=a.centre_fraction,
+                       altitude_m=a.altitude, hfov_deg=a.hfov)
     if a.source.is_dir() and a.fps is None:
         print("note: a frame folder has no frame rate; assuming 30 fps (pass --fps to set it)")
 
@@ -291,6 +316,10 @@ def main(argv: list[str] | None = None) -> None:
           f"{s['median_flow_ms']:.0f} ms each")
     print(f"  cells with reliable texture: {s['valid_cell_fraction']:.0%}")
     print(f"  mean speed over valid cells: {s['mean_speed_px_per_frame']:.2f} px/frame")
+    if s["gsd_m_per_px"] is not None:
+        print(f"  layer is in m/s: {s['gsd_m_per_px']:.4f} m per pixel, assuming the camera looks "
+              f"straight down from {a.altitude:g} m with a {a.hfov:g} degree horizontal field "
+              f"of view (assumptions unless you know the real camera)")
     before = s["mean_speed_before_px_per_frame"]
     if before is not None:
         print(f"  camera motion removed: whole-frame speed {before:.2f}"
