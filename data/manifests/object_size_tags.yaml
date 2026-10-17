@@ -1,0 +1,52 @@
+# Object-size tag per clip (small or large people in the frame), used only to pick the
+# DroneCrowd altitude proxy: large -> 50 m, small -> 100 m (see sentinel_ml/tracking/altitude.py).
+#
+# test: copied from the UP-COUNT tracker authors' repository (up-count/uav-dot-track,
+#       src/utils/video_reader.py, `dronecrowd_attributes`, which cites the DroneCrowd STNNet
+#       attribute lists). These are the authors' labels, not mine.
+# val:  to be filled in by looking at ONE frame per clip (the val contact sheet in
+#       data/outputs/contact_sheets/), before any altitude result is computed, and not changed
+#       afterwards. The authors' lists cover only the test clips. large = clearly larger people
+#       than in the small clips; small = the usual far-view clips. Tagged by: ______  Date: ______
+val:
+  6: null
+  47: null
+  52: null
+  59: null
+  67: null
+  71: null
+  73: null
+  84: null
+  85: null
+  89: null
+test:
+  11: small
+  15: small
+  16: small
+  17: large
+  18: large
+  22: small
+  23: small
+  24: small
+  34: small
+  35: small
+  42: small
+  43: small
+  44: small
+  61: small
+  62: small
+  63: small
+  65: small
+  69: small
+  70: small
+  74: small
+  75: large
+  82: large
+  88: large
+  95: large
+  101: large
+  103: large
+  105: large
+  108: large
+  111: large
+  112: large

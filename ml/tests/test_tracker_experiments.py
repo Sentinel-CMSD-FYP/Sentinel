@@ -33,7 +33,8 @@ def clip(n_frames, **kw):
 def result(thr, hits, age, err, cov=0.95):
     return {"score_thr": thr, "min_hits": hits, "max_age": age, "mean_err_pct": err,
             "mean_err_pct_min_len": err, "ids_per_person": 1.0, "mean_coverage": cov,
-            "spurious_ids": 0, "extra_ids_for_tracked": 0}
+            "mean_purity": 0.97, "max_age_s": None, "spurious_ids": 0,
+            "extra_ids_for_tracked": 0}
 
 
 def test_perfect_clip_scores_zero_error_full_coverage():
@@ -113,3 +114,32 @@ def test_outputs_and_table(tmp_path):
     assert "score_thr" in (tmp_path / "results.csv").read_text()
     table = te.format_table(rs, chosen, 0.9)
     assert "selected" in table and "coverage below floor" in table
+
+
+def result3(age_s, err, cov=0.95, purity=0.97):
+    r = result(0.35, 3, int(age_s * 25), err, cov)
+    r.update(max_age_s=age_s, mean_purity=purity)
+    return r
+
+
+def test_step3_purity_floor_stops_a_long_max_age_that_merges_people():
+    rs = [result3(1.0, 54.0), result3(2.0, 40.0), result3(4.0, 20.0, purity=0.90)]
+    assert te.select(rs, 0.90, 1.0, 3, min_purity=0.935)["max_age_s"] == 2.0
+    assert te.select(rs, 0.90, 1.0, 3, min_purity=None)["max_age_s"] == 4.0  # without the floor
+
+
+def test_step3_ties_go_to_the_smaller_max_age_s():
+    rs = [result3(3.0, 30.0), result3(1.5, 30.8), result3(4.0, 29.9)]
+    assert te.select(rs, 0.90, 1.0, 3, min_purity=0.935)["max_age_s"] == 1.5
+
+
+def test_step3_returns_none_when_no_config_meets_both_floors():
+    assert te.select([result3(2.0, 10.0, purity=0.5)], 0.90, 1.0, 3, min_purity=0.935) is None
+
+
+def test_evaluate_config_reports_purity_and_accepts_seconds():
+    doc, gt = clip(40, missing={2: set(range(10, 30))})  # a 20-frame dropout
+    five = te.evaluate_config({1: doc}, {1: gt}, replace(BASE, max_age=5), 45)
+    two_s = te.evaluate_config({1: doc}, {1: gt}, replace(BASE, max_age_s=2.0), 45)  # 50 frames
+    assert five["mean_purity"] == 1.0 and two_s["mean_purity"] == 1.0
+    assert two_s["mean_err_pct"] == 0.0 and five["mean_err_pct"] > 0.0

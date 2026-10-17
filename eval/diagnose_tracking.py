@@ -157,7 +157,11 @@ def short_track_links(tracks: dict, min_len: int = MIN_LEN) -> dict:
 
 
 def gt_identity(outputs: dict, gt: dict, n_gt: int) -> dict:
-    """Split output ids into real (mostly on a GT head) and spurious; count extra ids."""
+    """Split output ids into real (mostly on a GT head) and spurious; count extra ids.
+
+    ``purity``: over the rows of real ids that sit on a GT head, the share that belong to the
+    id's dominant GT person. 1.0 means no id ever jumped to a different person (no wrong merge).
+    """
     on_gt: dict[int, Counter] = defaultdict(Counter)
     rows_n: Counter = Counter()
     for fid, rows in outputs.items():
@@ -176,7 +180,9 @@ def gt_identity(outputs: dict, gt: dict, n_gt: int) -> dict:
         if on_gt[t]:
             per_person[on_gt[t].most_common(1)[0][0]].add(t)
     extra = sum(len(s) - 1 for s in per_person.values())
-    return {"output_ids": len(rows_n), "spurious_ids": len(spurious), "real_ids": len(real),
+    matched = sum(sum(on_gt[t].values()) for t in real)
+    dominant = sum(on_gt[t].most_common(1)[0][1] for t in real if on_gt[t])
+    return {"output_ids": len(rows_n), "purity": dominant / matched if matched else 1.0, "spurious_ids": len(spurious), "real_ids": len(real),
             "gt_people": n_gt, "gt_people_tracked": len(per_person), "extra_ids_for_tracked": extra,
             "gt_people_never_tracked": n_gt - len(per_person),
             "ids_per_tracked_person": dict(sorted(Counter(len(s) for s in

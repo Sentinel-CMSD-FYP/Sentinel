@@ -32,6 +32,7 @@ import yaml
 from sentinel_ml.localization import data as D
 from sentinel_ml.tracking import TrackerConfig
 from sentinel_ml.tracking.run_tracker import track_clip
+from sentinel_ml.tracking.tracker import resolve_config
 
 B_THRESHOLD = 0.20  # the score threshold chosen for B on val (docs/project-log.md)
 
@@ -39,7 +40,7 @@ B_THRESHOLD = 0.20  # the score threshold chosen for B on val (docs/project-log.
 def evaluate_config(points_docs: dict[int, dict], gt_by_clip: dict[int, dict], cfg: TrackerConfig,
                     min_len: int) -> dict:
     """Run the tracker with ``cfg`` on every clip and score it. Means are over clips."""
-    rows, coverage, spurious, extra = [], [], 0, 0
+    rows, coverage, purity, spurious, extra = [], [], [], 0, 0
     for clip, doc in sorted(points_docs.items()):
         tracks_doc = track_clip(doc, cfg)
         gt = gt_by_clip[clip]
@@ -48,6 +49,7 @@ def evaluate_config(points_docs: dict[int, dict], gt_by_clip: dict[int, dict], c
         ident = dg.gt_identity(outputs, gt, row["gt_people"])
         rows.append(row)
         coverage.append(ident["gt_people_tracked"] / row["gt_people"])
+        purity.append(ident["purity"])
         spurious += ident["spurious_ids"]
         extra += ident["extra_ids_for_tracked"]
     agg = tc.aggregate(rows)
@@ -55,19 +57,28 @@ def evaluate_config(points_docs: dict[int, dict], gt_by_clip: dict[int, dict], c
             "mean_err_pct_min_len": agg["min_len"]["mean_err_pct"],
             "ids_per_person": agg["all"]["mean_ids_per_person"],
             "mean_coverage": float(np.mean(coverage)),
+            "mean_purity": float(np.mean(purity)),
             "spurious_ids": spurious, "extra_ids_for_tracked": extra,
             "clips": len(rows)}
 
 
-def select(results: list[dict], min_coverage: float, tie_points: float, step: int) -> dict | None:
-    """Apply the pre-declared selection rule. Returns the chosen result, or None."""
-    eligible = [r for r in results if r["mean_coverage"] >= min_coverage]
+def select(results: list[dict], min_coverage: float, tie_points: float, step: int,
+           min_purity: float | None = None) -> dict | None:
+    """Apply the pre-declared selection rule. Returns the chosen result, or None.
+
+    Step 3 (extended max_age) also requires ``mean_purity >= min_purity`` so that a very long
+    max_age cannot win by merging different people; its tie-break is the smaller max_age_s.
+    """
+    eligible = [r for r in results if r["mean_coverage"] >= min_coverage
+                and (min_purity is None or r["mean_purity"] >= min_purity)]
     if not eligible:
         return None
     best = min(r["mean_err_pct"] for r in eligible)
     tied = [r for r in eligible if r["mean_err_pct"] <= best + tie_points]
     if step == 1:
         return min(tied, key=lambda r: (round(abs(r["score_thr"] - B_THRESHOLD), 9), r["score_thr"]))
+    if step == 3:
+        return min(tied, key=lambda r: r["max_age_s"])
     return min(tied, key=lambda r: (r["min_hits"], r["max_age"]))
 
 
@@ -81,34 +92,46 @@ def write_results(results: list[dict], chosen: dict | None, meta: dict, out_dir:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "results.json").write_text(
         json.dumps({**meta, "results": results, "selected": chosen}, indent=1) + "\n")
-    fields = ["score_thr", "min_hits", "max_age", "mean_err_pct", "mean_err_pct_min_len",
-              "ids_per_person", "mean_coverage", "spurious_ids", "extra_ids_for_tracked"]
+    fields = ["score_thr", "min_hits", "max_age", "max_age_s", "mean_err_pct",
+              "mean_err_pct_min_len", "ids_per_person", "mean_coverage", "mean_purity",
+              "spurious_ids", "extra_ids_for_tracked"]
     with (out_dir / "results.csv").open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(fields)
         for r in results:
-            w.writerow([round(r[k], 4) if isinstance(r[k], float) else r[k] for k in fields])
+            w.writerow([round(r.get(k), 4) if isinstance(r.get(k), float) else r.get(k)
+                        for k in fields])
 
 
-def format_table(results: list[dict], chosen: dict | None, min_coverage: float) -> str:
-    lines = ["score_thr min_hits max_age  err%(all)  err%(>=45)  ids/person  coverage  spurious  extra"]
+def format_table(results: list[dict], chosen: dict | None, min_coverage: float,
+                 min_purity: float | None = None) -> str:
+    lines = ["score_thr min_hits max_age max_age_s  err%(all)  err%(>=45)  ids/person  coverage"
+             "  purity  spurious  extra"]
     for r in results:
         mark = ""
         if chosen is r:
             mark = "  <= selected"
         elif r["mean_coverage"] < min_coverage:
             mark = "  (coverage below floor)"
-        lines.append(f"{r['score_thr']:9.2f} {r['min_hits']:8d} {r['max_age']:7d} {r['mean_err_pct']:10.1f}"
-                     f" {r['mean_err_pct_min_len']:11.1f} {r['ids_per_person']:11.2f} "
-                     f"{r['mean_coverage']:9.3f} {r['spurious_ids']:9d} {r['extra_ids_for_tracked']:6d}{mark}")
+        elif min_purity is not None and r["mean_purity"] < min_purity:
+            mark = "  (purity below floor)"
+        age_s = f"{r['max_age_s']:.1f}" if r.get("max_age_s") is not None else "-"
+        lines.append(f"{r['score_thr']:9.2f} {r['min_hits']:8d} {r['max_age']:7d} {age_s:>9} "
+                     f"{r['mean_err_pct']:10.1f} {r['mean_err_pct_min_len']:11.1f} "
+                     f"{r['ids_per_person']:11.2f} {r['mean_coverage']:9.3f} "
+                     f"{r['mean_purity']:7.3f} {r['spurious_ids']:9d} "
+                     f"{r['extra_ids_for_tracked']:6d}{mark}")
     return "\n".join(lines)
 
 
 def write_selected_config(base_path: Path, chosen: dict, out_path: Path) -> None:
     """Copy the baseline tracker config with the selected values (baseline file untouched)."""
     cfg = yaml.safe_load(base_path.read_text())
-    cfg["tracker"].update(score_thr=chosen["score_thr"], min_hits=chosen["min_hits"],
-                          max_age=chosen["max_age"])
+    cfg["tracker"].update(score_thr=chosen["score_thr"], min_hits=chosen["min_hits"])
+    if chosen.get("max_age_s") is not None:  # step 3: the miss limit is given in seconds
+        cfg["tracker"]["max_age_s"] = chosen["max_age_s"]
+    else:
+        cfg["tracker"]["max_age"] = chosen["max_age"]
     header = ("# Selected on val by eval/tracker_experiments.py (docs/project-log.md). Frozen: do not\n"
               "# change after the single test scoring. B's val points are optimistic.\n")
     out_path.write_text(header + yaml.safe_dump(cfg, sort_keys=False))
@@ -117,7 +140,7 @@ def write_selected_config(base_path: Path, chosen: dict, out_path: Path) -> None
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--config", type=Path, required=True)
-    ap.add_argument("--step", type=int, choices=[1, 2], required=True)
+    ap.add_argument("--step", type=int, choices=[1, 2, 3], required=True)
     ap.add_argument("--score-thr", type=float, help="step 2: override the step-1 selection")
     ap.add_argument("--write-selected", type=Path, help="write the chosen config to this yaml")
     args = ap.parse_args()
@@ -129,6 +152,10 @@ def main() -> None:
     out_dir = Path(cfg["out_dir"]) / f"step{args.step}"
     if args.step == 1:
         grid = [replace(base, score_thr=t, min_hits=3, max_age=5) for t in cfg["step1"]["score_thr"]]
+    elif args.step == 3:
+        base3 = TrackerConfig(**yaml.safe_load(
+            Path(cfg["tracker_config_step3"]).read_text())["tracker"])
+        grid = [replace(base3, max_age_s=a) for a in cfg["step3"]["max_age_s"]]
     else:
         thr = args.score_thr
         if thr is None:
@@ -145,20 +172,26 @@ def main() -> None:
     results = []
     for k, c in enumerate(grid, 1):
         r = evaluate_config(docs, gts, c, int(cfg["min_len_frames"]))
-        r.update(score_thr=c.score_thr, min_hits=c.min_hits, max_age=c.max_age)
+        shown = resolve_config(c, 25, 1, None)  # frames at 25 fps, for display (val clips are 25 fps)
+        r.update(score_thr=c.score_thr, min_hits=c.min_hits, max_age=shown.max_age,
+                 max_age_s=c.max_age_s)
         results.append(r)
-        print(f"[{k}/{len(grid)}] score_thr {c.score_thr} min_hits {c.min_hits} max_age {c.max_age}: "
+        print(f"[{k}/{len(grid)}] score_thr {c.score_thr} min_hits {c.min_hits} "
+              f"max_age {shown.max_age} frames: "
               f"err {r['mean_err_pct']:.1f}% coverage {r['mean_coverage']:.3f}", flush=True)
     sel = cfg["selection"]
-    chosen = select(results, float(sel["min_coverage"]), float(sel["tie_points"]), args.step)
-    print(format_table(results, chosen, float(sel["min_coverage"])))
+    min_purity = float(sel["step3_min_purity"]) if args.step == 3 else None
+    chosen = select(results, float(sel["min_coverage"]), float(sel["tie_points"]), args.step,
+                    min_purity)
+    print(format_table(results, chosen, float(sel["min_coverage"]), min_purity))
     meta = {"split": "val", "clips": len(docs), "step": args.step,
             "note": "val only; B trained on these clips so results are optimistic",
             "selection_rule": sel}
     write_results(results, chosen, meta, out_dir)
     print(f"wrote {out_dir / 'results.json'} and results.csv; selected: {chosen}")
     if args.write_selected and chosen is not None:
-        write_selected_config(Path(cfg["tracker_config"]), chosen, args.write_selected)
+        base_yaml = cfg["tracker_config_step3"] if args.step == 3 else cfg["tracker_config"]
+        write_selected_config(Path(base_yaml), chosen, args.write_selected)
         print(f"wrote {args.write_selected}")
 
 

@@ -168,6 +168,43 @@ provisional and nothing is marked pass or fail.
   showed up in practice. Nothing was changed after seeing the test result, and no test baseline with the
   default settings exists.
 
+## 18 Oct (later): decisions after the E-3 baseline
+- E-3 accepted as "baseline measured, target not met". CI passed on the merged pull request (#7).
+- Target: 25% tracking count error stays as a stretch goal only. Provisional sign-off target I can
+  defend from the evidence: tracking count error <= 35% with the >=45-frame filter, DroneCrowd test,
+  all clips, with IDF1 reported alongside (baseline: 38.7% filtered, 48.5% unfiltered; the authors'
+  own no-DDCF DroneCrowd rows are 0.30 to 0.32, 0.23 with DDCF). Still provisional: the Phase 0 sheet is
+  an unsigned draft. DDCF is decided only after E-2 and the extended max_age results on val.
+- Scope: night is out of scope; dusk is reported separately with no target; night results are reported as
+  a limitation, not hidden (test night clips: 69, 70, 74; dusk: val clips 71, 73, none in test). Wording for
+  the sheet: "Night is out of scope. Dusk is reported separately, with no target. Night results are
+  reported as a limitation."
+- Plan additions: IDF1 and HOTA through TrackEval (converted MOT text against the authors' MOT-format GT,
+  same ids as my .mat GT; TrackEval imports on the current numpy, not yet run on real tracks). CMC will take
+  a flow field in and give a camera translation out, behind a small interface, so Mahid's flow code (now on
+  main under `eval/optical_flow_farneback/`) or another model can be swapped in; the authors' halved
+  translation is not copied.
+- Second look at test: allowed only if the comparison and config are fixed on val in writing first, both
+  test runs are reported (never the better one chosen on test), the second run is labelled "second look,
+  not blind", and my own footage is preferred as the next clean test.
+- E-2a built: seconds for the miss limit (`max_age_s`, converted with the clip's fps and frame_stride) and
+  an altitude-scaled gate (authors' rule `size = int(100/alt * 20)`), both off by default, so the baseline
+  is unchanged (148 tests pass). A gate in metres is not possible: it needs the camera field of view or
+  intrinsics, which DroneCrowd does not give. DroneCrowd benchmarking uses the authors' object-size proxy
+  (50 for large, 100 for small clips; their list covers the test clips only), the pipeline keeps 60 m.
+  The val clips need small/large tags from me before altitude can be compared on val.
+- Extended max_age on val first (25 frames was the edge of the grid): step 3 sweeps 1.0 to 4.0 s at the
+  frozen score 0.35 and min_hits 3, with a new identity-purity metric so a long max_age cannot win by
+  merging different people (purity floor 0.935 = the step-2 winner's 0.955 minus 0.02, declared before the
+  run).
+
+- Step 3 result (val, 10 clips, B trained on these clips): count error without the filter falls from 54.7%
+  at a 1.0 s miss limit to 39.4% at 4.0 s (extra ids for tracked people 829 to 596), the filtered view stays
+  flat (11.2% to 11.6%), and purity stays at 0.945 or higher. Coverage falls from 0.904 to 0.887, and the
+  0.90 floor declared in advance excludes every value above 1.0 s (first step: 0.895). By the rule as
+  written the selection stays at 1.0 s. I am not changing the rule after seeing this; relaxing the floor
+  would be a post-hoc decision and would have to be written down as one before the second look at test.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.

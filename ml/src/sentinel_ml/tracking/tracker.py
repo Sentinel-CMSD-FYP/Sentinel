@@ -16,7 +16,8 @@ Units: pixels and processed frames. Coordinates: x = column, y = row, original f
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
 from enum import Enum
 
 import numpy as np
@@ -41,6 +42,14 @@ class TrackerConfig:
     border_margin_px: a track whose predicted position comes closer than this to the frame
         border is killed. 10 is the authors' rule (half of size_px). It means heads within
         10 px of the border never get a confirmed track; 0 only kills tracks that leave.
+    use_altitude: scale the gate with the clip's altitude (authors' rule
+        ``size = int(ref_altitude_m / altitude_m * size_px)``). Off by default.
+    ref_altitude_m: altitude at which the gate equals ``size_px`` (the authors use 100 m).
+    max_age_s: if set, the miss limit in seconds; it replaces ``max_age`` (frames) once the
+        clip's fps and frame_stride are known. ``resolve_config`` does the conversion.
+
+    A config with ``use_altitude`` or ``max_age_s`` is "unresolved": pass it through
+    :func:`resolve_config` (``run_tracker.track_clip`` does) before building a tracker.
     """
 
     max_age: int = 5
@@ -48,11 +57,38 @@ class TrackerConfig:
     score_thr: float = 0.2
     size_px: int = 20
     border_margin_px: int = 10
+    use_altitude: bool = False
+    ref_altitude_m: float = 100.0
+    max_age_s: float | None = None
     p_pos: float = 10.0
     p_vel: float = 10000.0
     q_pos: float = 1.0
     q_vel: float = 0.5
     r_meas: float = 1.0
+
+
+def resolve_config(cfg: TrackerConfig, fps: float | None, frame_stride: int,
+                   altitude_m: float | None) -> TrackerConfig:
+    """Turn seconds and altitude into the frames and pixels the tracker works in.
+
+    * ``max_age_s`` becomes ``max_age`` frames: ``ceil(max_age_s * fps / frame_stride)``, at
+      least 1 (``frame_stride`` > 1 means each processed frame spans several video frames).
+    * ``use_altitude`` becomes a new ``size_px``: ``int(ref_altitude_m / altitude_m * size_px)``.
+    The result has ``max_age_s = None`` and ``use_altitude = False``, so it is applied once.
+    Units: ``fps`` in frames per second, ``altitude_m`` in metres, results in frames and pixels.
+    """
+    out = cfg
+    if cfg.max_age_s is not None:
+        if not fps or fps <= 0:
+            raise ValueError("max_age_s needs the clip's fps (the header has none)")
+        frames = max(1, math.ceil(cfg.max_age_s * fps / max(1, frame_stride) - 1e-9))
+        out = replace(out, max_age=frames, max_age_s=None)
+    if cfg.use_altitude:
+        if altitude_m is None or altitude_m <= 0:
+            raise ValueError("use_altitude needs altitude_m > 0")
+        out = replace(out, size_px=max(2, int(cfg.ref_altitude_m / altitude_m * cfg.size_px)),
+                      use_altitude=False)
+    return out
 
 
 class Track:
@@ -108,6 +144,8 @@ class PointTracker:
 
     def __init__(self, frame_size: tuple[int, int], cfg: TrackerConfig | None = None) -> None:
         self.cfg = cfg or TrackerConfig()
+        if self.cfg.use_altitude or self.cfg.max_age_s is not None:
+            raise ValueError("unresolved config: pass it through resolve_config first")
         self.frame_size = (int(frame_size[0]), int(frame_size[1]))
         self.tracks: list[Track] = []
         self._next_id = 1
