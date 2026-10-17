@@ -208,6 +208,21 @@ def dataset_from_config(cfg: dict, split: str, **kwargs) -> DroneCrowdDataset:
                              cfg["test_dir"], **kwargs)
 
 
+def clip_gt_frames(cfg: dict, split: str, clip: int,
+                   frame_ids: list[int]) -> dict[int, tuple[np.ndarray, np.ndarray]]:
+    """GT of one clip as ``{frame_id: (points (N, 2) x, y px, person_ids (N,))}``.
+
+    Reads only the ``.mat`` files, never the images, so it works when the train images are
+    on a drive that is not plugged in. ``frame_ids`` are 0-based (file number minus 1).
+    """
+    folder = Path(cfg["root"]) / (cfg["test_dir"] if split == "test" else cfg["train_dir"])
+    out = {}
+    for fid in frame_ids:
+        path = folder / "ground_truth" / f"GT_img{clip:03d}{fid + 1:03d}.mat"
+        out[int(fid)] = load_gt(path)
+    return out
+
+
 def draw_check(cfg: dict, splits: tuple[str, ...] = SPLITS, per_split: int = 2) -> list[Path]:
     """Save a few frames per split with GT drawn, for visual alignment checks."""
     out_dir = Path(cfg["check_dir"])

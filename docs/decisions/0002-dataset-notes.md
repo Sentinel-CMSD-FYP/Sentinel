@@ -28,3 +28,17 @@ Decisions made by Ahmed (2026-10-11):
 Open issues:
 - Only 12 frames were looked at, so the "dots on heads" check is a spot check.
 - Exact validation clip list and seed to be chosen and recorded in B-1.
+
+## Storage (2026-10-15): train images live on a USB drive
+Context: the laptop's C: drive was nearly full (9.2 GB free). Claude's Kaggle packs had added about 7 GB (deleted, they can be rebuilt with `eval/pack_for_kaggle.py`) and the dataset is 11 GB.
+Decision: the 24,600 train images (7.7 GB, 8,263,638,526 bytes on disk) were moved to `D:\dronecrowd\train_images` (USB, FAT32, 14.6 GB). A Windows junction at the old path `data\dronecrowd\train_data-002\train_data\images` points to it, so no config or code changed.
+Evidence: robocopy copied 24,600 files, 0 failed; names and sizes identical; 60 random files had matching SHA-256; after the swap the loader read a real frame from train, val and test, and all 80 tests passed. C: free went from 9.2 GB to 25.0 GB.
+Stays on C:: test images (Model E needs frames), all ground truth `.mat` files (tiny; the train GT folder has too many long file names for FAT32), annotations, predictions and results.
+Things to know:
+- Anything that reads train or val images (val overlays, the val contact sheet, rebuilding the val Kaggle pack, training our own model) needs the USB drive plugged in. Test images, GT and predictions work without it.
+- If the drive gets another letter or the junction is lost, recreate it (PowerShell, adjust the drive letter):
+  `cmd /c rmdir "C:\dev\fyp\data\dronecrowd\train_data-002\train_data\images"` then
+  `cmd /c mklink /J "C:\dev\fyp\data\dronecrowd\train_data-002\train_data\images" "D:\dronecrowd\train_images"`
+  Do not use `Remove-Item -Recurse` on the junction path: it can delete the files on the drive.
+- FAT32 has a 4 GB file limit and about 65,000 entries per folder; the train image folder (24,600 files) fits, a bigger folder may not.
+- The USB copy is now the only copy of these images on this machine (the official download is the other source). Do not format the drive.
