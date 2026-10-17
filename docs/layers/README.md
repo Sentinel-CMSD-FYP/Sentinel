@@ -106,7 +106,16 @@ layer file is declared in `clip.json` with the right type. The ingestion endpoin
 pip install jsonschema numpy opencv-python-headless imageio-ffmpeg
 python docs/layers/make_sample_clip.py data/samples/demo_fake   # fake clip, validated on write
 python docs/layers/validate.py data/samples/demo_fake           # validate any clip folder
+python docs/layers/add_layer.py data/samples/demo_fake density.json --label "Density"
 ```
+
+`add_layer.py` puts a model's layer into a clip folder and lists it in `clip.json`, so nobody edits the
+list by hand. It refuses, and writes nothing, when the layer is invalid under the contract, was made for a
+different `clip_id`, has a `frame_size` that differs from the clip's video (the model was run on a
+different file or resolution), or uses frame numbers beyond the clip. It also refuses to overwrite an
+existing layer unless `--replace` is given, and `--remove NAME` takes a layer out again. Grids start
+visible and dots and tracks start hidden (`--visible` / `--hidden` override), and a grid with `u` and `v`
+fields is drawn as arrows, any other grid as a heatmap of its first field (`--field` picks another).
 
 The fake clip (`make_sample_clip.py`) is generated, not committed (`data/` is gitignored). It is
 simulated crowd data, not model output, with a deliberate gap in the flow layer (frames 100 to 149)
