@@ -29,7 +29,9 @@ can become ground cells with the same fields, without changing the format.
   Nothing is interpolated or carried forward. `max_age_frames` says how long a sample stays
   displayable; after that the frontend shows nothing.
 - **Units are explicit.** Flow is `px_per_frame` in original-frame pixels until a ground conversion
-  exists; then it becomes `m_per_s` and the `units` field says so.
+  exists; then it becomes `m_per_s` and the `units` field says so. The flow exporter writes `m_per_s`
+  when it is given `--altitude` and `--hfov` (a straight-down camera over flat ground is assumed;
+  see `docs/decisions/0006-geometry-ground-sampling.md`).
 - **Models may run slower than the video.** Flow and density at about 1 Hz are normal. Entries are
   sparse; they are not required for every frame.
 - **Dwell before risk.** A risk layer (later) must not emit a score for a cell until its history fills
