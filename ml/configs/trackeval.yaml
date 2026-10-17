@@ -1,0 +1,14 @@
+# Config for eval/trackeval_eval.py (IDF1 / HOTA / MOTA / ID switches). Paths relative to the repo root.
+data_config: ml/configs/dronecrowd_data.yaml
+trackeval_path: ml/third_party/uav-dot-track/eval/TrackEval   # git-ignored clone, MIT licence
+points_dir: data/outputs/points                                # <points_dir>/<split>/clip_XXX_points.json
+min_len_frames: 45        # the filtered view keeps ids output in at least this many frames (offline)
+sanity_clips: 3           # how many val clips the sanity checks run on
+thresholds: [0.5, 0.3]    # metric IoU thresholds: 0.5 primary (standard), 0.3 about a 10 px offset
+oracle_score_thr: [0.35, 0.2]   # score thresholds for the perfect-association oracle (--oracle)
+sanity_thresholds: [0.0, 0.5]   # 0.0 is the authors' setting; it is run only to show it breaks IDF1/IDSW
+out_dir: data/outputs/trackeval                                # results go to <out_dir>/<split>/
+trackers:                 # name -> tracker config (all with CMC and altitude scaling off)
+  e1_defaults: ml/configs/tracker.yaml                # score 0.2, min_hits 3, max_age 5 frames
+  step2_selected: ml/configs/tracker_selected.yaml    # score 0.35, min_hits 3, max_age 25 frames
+  e2_candidate: ml/configs/tracker_e2_candidate.yaml  # score 0.35, min_hits 3, max_age 3.0 s

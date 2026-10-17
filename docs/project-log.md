@@ -247,6 +247,32 @@ provisional and nothing is marked pass or fail.
   itself works (a 30 px camera jump is handled in a test), so the code stays, off by default, to be re-tested on
   my own footage. Candidate config after E-2: score 0.35, min_hits 3, max_age 3.0 s, altitude off, CMC off.
 
+- E-2 closed: CMC and altitude scaling both stay off by the rules fixed in advance. CMC is untested beyond
+  DroneCrowd val and altitude is untested on real altitude; both are to be re-tested on my own footage. The
+  video check for E-2 is waived because the estimated camera shifts are tiny (val per-clip median 0.02 to
+  0.06 px per frame, at most 1.19 px per frame on the 30 test clips).
+- IDF1 and HOTA with TrackEval (tool `eval/trackeval_eval.py`, 186 tests pass). Sanity checks first, on
+  3 val clips (553 GT people): ground truth as prediction scores 1.0 on everything with 0 switches; a consistent
+  relabelling changes nothing; shuffled ids keep DetA 0.999 but give HOTA 0.091, IDF1 0.033 and 138,270 ID
+  switches; dropping half the detections gives IDF1 0.662 (expected 0.667). One finding: at the metric
+  threshold 0.0 used in the authors' evaluation script, shuffled ids keep IDF1 1.0 and show 106 switches, so
+  IDF1 and ID switches stop measuring identity at that setting (HOTA is unaffected). I did not run their
+  pipeline (this is from reading their script and running TrackEval at 0.0 on our GT), so their ID-switch
+  figures should not be compared with mine. I use the standard IoU 0.5, with 0.3 (about a 10 px offset) as
+  secondary.
+- Val results (10 clips, 1964 GT people, IoU 0.5; B trained on these clips, so optimistic). E-2 candidate
+  (score 0.35, max_age 3.0 s, no altitude scaling, no CMC): HOTA 0.523, DetA 0.496, AssA 0.553, IDF1 0.706,
+  MOTA 0.619, 2,366 ID switches; with the >=45-frame filter IDF1 0.707 and 1,518 switches. The E-1 defaults
+  give HOTA 0.542, IDF1 0.698 and 4,193 switches, so the new settings cut switches by 44% and move IDF1 only
+  slightly; HOTA drops a little because the higher score threshold lowers DetA. At IoU 0.3 the candidate's
+  IDF1 is 0.739.
+- DDCF evidence on val: a perfect-association oracle on B's points (score 0.35) reaches IDF1 0.784, HOTA 0.564
+  and 352 switches against the candidate's 0.706, 0.523 and 2,366, so better association has about 0.08 IDF1
+  of headroom, and even perfect association leaves DetA at 0.503 (B's detections are the limit). The
+  authors' own HOTA gain from DDCF is 0.01 (0.53 to 0.54). DDCF would also add frames and decoder output to E
+  and an unmeasured speed cost. Recommended decision (mine to confirm): do not build DDCF now; revisit only
+  if test run 2 gives a >=45-frame-filtered count error above the provisional 35% sign-off target.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.
