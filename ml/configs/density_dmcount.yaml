@@ -1,0 +1,5 @@
+# DM-Count density model (Tier 1, Model A).
+# Released UCF-QNRF weights from the DM-Count repo; fine tuned weights replace them in step 9.
+
+weights: data/weights/dmcount/model_qnrf.pth   # relative to the repo root
+device: auto                                   # cuda if available, else cpu
