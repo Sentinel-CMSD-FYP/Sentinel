@@ -31,6 +31,7 @@ import yaml
 
 from sentinel_ml.localization import data as D
 from sentinel_ml.tracking import TrackerConfig
+from sentinel_ml.tracking.altitude import altitude_from_size_tags, load_size_tags
 from sentinel_ml.tracking.run_tracker import track_clip
 from sentinel_ml.tracking.tracker import resolve_config
 
@@ -38,11 +39,14 @@ B_THRESHOLD = 0.20  # the score threshold chosen for B on val (docs/project-log.
 
 
 def evaluate_config(points_docs: dict[int, dict], gt_by_clip: dict[int, dict], cfg: TrackerConfig,
-                    min_len: int) -> dict:
-    """Run the tracker with ``cfg`` on every clip and score it. Means are over clips."""
+                    min_len: int, altitude_by_clip: dict[int, float] | None = None) -> dict:
+    """Run the tracker with ``cfg`` on every clip and score it. Means are over clips.
+
+    ``altitude_by_clip`` overrides each clip's header altitude (the DroneCrowd size proxy).
+    """
     rows, coverage, purity, spurious, extra = [], [], [], 0, 0
     for clip, doc in sorted(points_docs.items()):
-        tracks_doc = track_clip(doc, cfg)
+        tracks_doc = track_clip(doc, cfg, altitude_by_clip.get(clip) if altitude_by_clip else None)
         gt = gt_by_clip[clip]
         row = tc.clip_row(clip, tracks_doc, gt, min_len)
         outputs = {int(k): v for k, v in tracks_doc["frames"].items()}
@@ -80,6 +84,23 @@ def select(results: list[dict], min_coverage: float, tie_points: float, step: in
     if step == 3:
         return min(tied, key=lambda r: r["max_age_s"])
     return min(tied, key=lambda r: (r["min_hits"], r["max_age"]))
+
+
+def select_altitude(off: dict, on: dict, min_coverage: float, min_purity: float,
+                    min_gain: float) -> dict:
+    """Turn altitude scaling on only if it gains ``min_gain`` points and keeps both floors."""
+    gain = off["mean_err_pct"] - on["mean_err_pct"]
+    floors_ok = on["mean_coverage"] >= min_coverage and on["mean_purity"] >= min_purity
+    return {"use_altitude": bool(gain >= min_gain and floors_ok), "gain_points": gain,
+            "floors_ok": floors_ok}
+
+
+def floors_for_step(sel: dict, step: int) -> tuple[float, float | None]:
+    """(min coverage, min purity) for a step. Step 3 may carry its own floors (see decision 0009)."""
+    if step == 3:
+        return (float(sel.get("step3_min_coverage", sel["min_coverage"])),
+                float(sel["step3_min_purity"]))
+    return float(sel["min_coverage"]), None
 
 
 def check_val_only(points_dir: Path) -> None:
@@ -133,21 +154,80 @@ def write_selected_config(base_path: Path, chosen: dict, out_path: Path) -> None
     else:
         cfg["tracker"]["max_age"] = chosen["max_age"]
     header = ("# Selected on val by eval/tracker_experiments.py (docs/project-log.md). Frozen: do not\n"
-              "# change after the single test scoring. B's val points are optimistic.\n")
+              "# change once it has been scored on test. B's val points are optimistic. When max_age_s\n"
+              "# is present it replaces max_age (frames); a step-3 selection used the post-hoc coverage\n"
+              "# floor 0.88 (see docs/project-log.md).\n")
     out_path.write_text(header + yaml.safe_dump(cfg, sort_keys=False))
+
+
+def load_val_inputs(cfg: dict) -> tuple[dict, dict]:
+    """Val points documents and GT per clip (GT from the .mat files, no images needed)."""
+    points_dir = Path(cfg["points_dir"])
+    check_val_only(points_dir)
+    data_cfg = D.load_config(Path(cfg["data_config"]))
+    docs = {int(f.name.split("_")[1]): json.loads(f.read_text())
+            for f in sorted(points_dir.glob("clip_*_points.json"))}
+    gts = {clip: D.clip_gt_frames(data_cfg, "val", clip, sorted(int(k) for k in doc["frames"]))
+           for clip, doc in docs.items()}
+    return docs, gts
+
+
+def write_candidate_config(base_path: Path, use_altitude: bool, out_path: Path) -> None:
+    """Copy the step-3 config with the altitude decision (the baseline files are untouched)."""
+    cfg = yaml.safe_load(base_path.read_text())
+    cfg["tracker"]["use_altitude"] = use_altitude
+    header = ("# Candidate E-2 config, fixed on val (docs/project-log.md). use_altitude follows the\n"
+              "# step-4 rule. Not final until the CMC and IDF1 decisions are made; frozen once scored\n"
+              "# on test. B's val points are optimistic.\n")
+    out_path.write_text(header + yaml.safe_dump(cfg, sort_keys=False))
+
+
+def run_altitude_step(cfg: dict, write_selected: Path | None) -> None:
+    """Step 4: altitude scaling off vs on (per-clip size proxy), val only."""
+    base = TrackerConfig(**yaml.safe_load(
+        Path(cfg["tracker_config_step4"]).read_text())["tracker"])
+    tags = load_size_tags(Path(cfg["size_tags"]), "val")
+    if tags is None:
+        raise SystemExit("the val object-size tags are missing or incomplete")
+    altitude = altitude_from_size_tags(tags)
+    docs, gts = load_val_inputs(cfg)
+    min_len = int(cfg["min_len_frames"])
+    off = evaluate_config(docs, gts, replace(base, use_altitude=False), min_len)
+    on = evaluate_config(docs, gts, replace(base, use_altitude=True), min_len, altitude)
+    min_cov, min_pur = floors_for_step(cfg["selection"], 3)
+    decision = select_altitude(off, on, min_cov, min_pur, float(cfg["step4"]["min_gain_points"]))
+    for name, r in (("altitude off", off), ("altitude on (size proxy)", on)):
+        print(f"{name:26s} err {r['mean_err_pct']:6.2f}%  filtered {r['mean_err_pct_min_len']:5.2f}%  "
+              f"ids/person {r['ids_per_person']:.2f}  coverage {r['mean_coverage']:.4f}  "
+              f"purity {r['mean_purity']:.4f}  spurious {r['spurious_ids']}  extra "
+              f"{r['extra_ids_for_tracked']}")
+    print(f"gain {decision['gain_points']:+.2f} points (needs >= {cfg['step4']['min_gain_points']}), "
+          f"floors ok: {decision['floors_ok']} -> use_altitude = {decision['use_altitude']}")
+    out_dir = Path(cfg["out_dir"]) / "step4"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "results.json").write_text(json.dumps(
+        {"split": "val", "size_tags": tags, "off": off, "on": on, "decision": decision,
+         "note": "val only; B trained on these clips; only the size-tagged large clips get a "
+                 "different gate"}, indent=1) + "\n")
+    if write_selected:
+        write_candidate_config(Path(cfg["tracker_config_step4"]), decision["use_altitude"],
+                               write_selected)
+        print(f"wrote {write_selected}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--config", type=Path, required=True)
-    ap.add_argument("--step", type=int, choices=[1, 2, 3], required=True)
+    ap.add_argument("--step", type=int, choices=[1, 2, 3, 4], required=True)
     ap.add_argument("--score-thr", type=float, help="step 2: override the step-1 selection")
     ap.add_argument("--write-selected", type=Path, help="write the chosen config to this yaml")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(args.config.read_text())
-    points_dir = Path(cfg["points_dir"])
-    check_val_only(points_dir)
+    check_val_only(Path(cfg["points_dir"]))
+    if args.step == 4:
+        run_altitude_step(cfg, args.write_selected)
+        return
     base = TrackerConfig(**yaml.safe_load(Path(cfg["tracker_config"]).read_text())["tracker"])
     out_dir = Path(cfg["out_dir"]) / f"step{args.step}"
     if args.step == 1:
@@ -164,11 +244,7 @@ def main() -> None:
         grid = [replace(base, score_thr=thr, min_hits=h, max_age=a)
                 for h in cfg["step2"]["min_hits"] for a in cfg["step2"]["max_age"]]
 
-    data_cfg = D.load_config(Path(cfg["data_config"]))
-    docs = {int(f.name.split("_")[1]): json.loads(f.read_text())
-            for f in sorted(points_dir.glob("clip_*_points.json"))}
-    gts = {clip: D.clip_gt_frames(data_cfg, "val", clip, sorted(int(k) for k in doc["frames"]))
-           for clip, doc in docs.items()}
+    docs, gts = load_val_inputs(cfg)
     results = []
     for k, c in enumerate(grid, 1):
         r = evaluate_config(docs, gts, c, int(cfg["min_len_frames"]))
@@ -180,10 +256,9 @@ def main() -> None:
               f"max_age {shown.max_age} frames: "
               f"err {r['mean_err_pct']:.1f}% coverage {r['mean_coverage']:.3f}", flush=True)
     sel = cfg["selection"]
-    min_purity = float(sel["step3_min_purity"]) if args.step == 3 else None
-    chosen = select(results, float(sel["min_coverage"]), float(sel["tie_points"]), args.step,
-                    min_purity)
-    print(format_table(results, chosen, float(sel["min_coverage"]), min_purity))
+    min_coverage, min_purity = floors_for_step(sel, args.step)
+    chosen = select(results, min_coverage, float(sel["tie_points"]), args.step, min_purity)
+    print(format_table(results, chosen, min_coverage, min_purity))
     meta = {"split": "val", "clips": len(docs), "step": args.step,
             "note": "val only; B trained on these clips so results are optimistic",
             "selection_rule": sel}

@@ -1,0 +1,18 @@
+# Candidate E-2 config, fixed on val (docs/project-log.md). use_altitude follows the
+# step-4 rule. Not final until the CMC and IDF1 decisions are made; frozen once scored
+# on test. B's val points are optimistic.
+points_dir: data/outputs/points
+out_dir: data/outputs/tracks
+tracker:
+  max_age: 25
+  min_hits: 3
+  score_thr: 0.35
+  size_px: 20
+  border_margin_px: 10
+  p_pos: 10.0
+  p_vel: 10000.0
+  q_pos: 1.0
+  q_vel: 0.5
+  r_meas: 1.0
+  max_age_s: 3.0
+  use_altitude: false

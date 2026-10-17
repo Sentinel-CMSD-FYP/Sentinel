@@ -9,16 +9,16 @@
 #       afterwards. The authors' lists cover only the test clips. large = clearly larger people
 #       than in the small clips; small = the usual far-view clips. Tagged by: ______  Date: ______
 val:
-  6: null
-  47: null
-  52: null
-  59: null
-  67: null
-  71: null
-  73: null
-  84: null
-  85: null
-  89: null
+  6: small
+  47: small
+  52: small
+  59: small
+  67: small
+  71: small
+  73: small
+  84: large
+  85: large
+  89: large
 test:
   11: small
   15: small

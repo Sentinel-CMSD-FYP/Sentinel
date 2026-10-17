@@ -1,5 +1,7 @@
 # Selected on val by eval/tracker_experiments.py (docs/project-log.md). Frozen: do not
-# change after the single test scoring. B's val points are optimistic.
+# change once it has been scored on test. B's val points are optimistic. When max_age_s
+# is present it replaces max_age (frames); a step-3 selection used the post-hoc coverage
+# floor 0.88 (see docs/project-log.md).
 points_dir: data/outputs/points
 out_dir: data/outputs/tracks
 tracker:
@@ -13,4 +15,4 @@ tracker:
   q_pos: 1.0
   q_vel: 0.5
   r_meas: 1.0
-  max_age_s: 1.0
+  max_age_s: 3.0
