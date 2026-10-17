@@ -104,7 +104,11 @@ number, unique within the clip, and never reused for a different person. Optiona
      <clip_id>/video.mp4
      <clip_id>/layers/<layer>.json
 
-   You do not have to write clip.json yourself; just tell Mahid the details.
+   You do not have to write clip.json yourself; just tell Mahid the details. Mahid adds your
+   layer to the clip with add_layer.py, which refuses a layer that does not match the clip:
+   a different clip_id, a frame_size that differs from the clip's video (so run your model on
+   the clip's own video.mp4, not the original download), frame numbers beyond the clip, or
+   anything that fails the check below.
 
    The video must be H.264 (yuv420p) or browsers will not play it. Most downloaded or phone
    videos already are; OpenCV's default "mp4v" writer is not.
