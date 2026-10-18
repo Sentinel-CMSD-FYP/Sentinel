@@ -322,12 +322,28 @@ provisional and nothing is marked pass or fail.
   (training on the 72 train clips would also give a clean val). E-4 (ID-stability clips) and E-5 (B+E speed on
   the 4070) are still to do, then integration.
 
+- Decision after the oracle: DDCF is closed and not built (the rule I set before the run said no). For the
+  tracker I accept and report the limitation (filtered count error 37.9% against the provisional 35%, IDF1
+  0.388, HOTA 0.300, second look, not blind; a gap, not a pass). Improving B is the next investment, but a
+  scoping note with a success rule and a Kaggle-hours cap comes first, before any training. Night stays out of
+  scope; dusk is reported separately with no target. Next: E-5 (B+E speed, average and p95 frames/s per
+  stream with 3 to 4 streams), then E-4 (ID-stability clips), then the B note.
+
+- E-5 (B+E speed) is written and tested on CPU, but not measured: the 4070 is not available right now. No
+  Kaggle interim number (a T4 miss would say little about the 4070). Status in every table: "not measured
+  (4070 unavailable)". I will book the 4070 and run it myself. Script: `eval/benchmark_be.py`.
+- E-4 (ID-stability clips): picked the clips by a rule written before rendering, so I do not cherry-pick: rank
+  the 30 test clips by run-2 IDF1, take the 4 highest, the 4 lowest and 4 random (seed 0) from the rest; 10 s
+  of footage each, from the frozen run-2 tracks. File names carry only the clip number, and the group and
+  numbers are in a separate `index.csv` that I open after watching. My judgement is recorded below once I have
+  watched them.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.
 - E-4 (ID-stability videos, best and worst clips, my judgement) and E-5 (B+E speed on the 4070 with nothing
   else running, target 5 frames/s per stream; Kaggle only as fallback).
-- Decide whether DDCF is needed for the count target, and whether to keep the 25% figure (the draft Phase 0
+- (Closed 18 Oct: DDCF not built, see above.) Earlier question: whether DDCF is needed for the count target, and whether to keep the 25% figure (the draft Phase 0
   sheet is unsigned and says E reaches it only with DDCF in the authors' results). Tell the supervisor.
 - Decide dusk and night scope (not covered by the Phase 0 sheet).
 - Ask Mahid whether camera-motion compensation can reuse his optical-flow output.
