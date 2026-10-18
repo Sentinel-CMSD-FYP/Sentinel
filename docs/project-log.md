@@ -11,6 +11,8 @@ produce them are in `eval/` and `ml/src/sentinel_ml/`.
 | Same on validation | 0.8635 (optimistic, see caveats) | 10 held-out train clips |
 | Tracking count error, no filter | 48.5% mean over clips (median 48.6%, 1.33 ids per person) | DroneCrowd test, tracker frozen from val, no CMC, no altitude scaling |
 | Tracking count error, >=45-frame filter (offline) | 38.7% mean (median 30.4%) | same run |
+| Tracking count error, run 2 (frozen E-2 config) | 35.2% unfiltered, 37.9% filtered (>=45 frames), mean over clips | DroneCrowd test, second look, not blind, no CMC, no altitude scaling |
+| IDF1 / HOTA, run 2 | 0.388 / 0.300 (run 1: 0.384 / 0.298) | TrackEval IoU 0.5, DroneCrowd test, mean over clips |
 | B speed | 4.79 frames/s (val), 4.78 (test), model only | Kaggle T4, not the 4070, not B+E |
 | E speed, B+E benchmark | not measured yet | |
 No numeric F1 target exists; the count targets in the draft Phase 0 sheet (unsigned) are treated as
@@ -272,6 +274,33 @@ provisional and nothing is marked pass or fail.
   authors' own HOTA gain from DDCF is 0.01 (0.53 to 0.54). DDCF would also add frames and decoder output to E
   and an unmeasured speed cost. Recommended decision (mine to confirm): do not build DDCF now; revisit only
   if test run 2 gives a >=45-frame-filtered count error above the provisional 35% sign-off target.
+
+- Config frozen in writing before test run 2 (DDCF: not building it now, revisit only if run 2's >=45-frame
+  filtered count error exceeds 35%; I do not compare my ID switches with the authors' because of their 0.0
+  threshold). Frozen config `ml/configs/tracker_e2_candidate.yaml` (sha256 59c6ebea4a1e3348...): score 0.35,
+  min_hits 3, max_age 3.0 s (75 frames), gate 20 px, border margin 10 px, authors' Kalman noise, no altitude
+  scaling, no CMC. It was chosen on val (optimistic: B trained on those clips), with the post-hoc coverage floor
+  0.88 in step 3. Inputs: B's 30 test points files from the Kaggle run of 2026-10-14 (combined sha256
+  1e3f32527c56f22f...), tracker code at commit 4104a95. Run 2 is a second look at DroneCrowd test and is
+  labelled "second look, not blind": the test split was already scored by run 1 (48.5% unfiltered, 38.7%
+  filtered), clips 011 and 075 were seen in the investigation, and the config was chosen knowing run 1.
+  Both runs are reported, per clip and overall, with count error, IDF1, HOTA, MOTA and ID switches; the better
+  one is never chosen on test. Sign-off reading: filtered count error <= 35% on test with IDF1 reported, from
+  run 2's filtered mean next to run 1's, nothing called pass or fail until the Phase 0 sheet is signed.
+
+- Test run 2 ("second look, not blind", frozen config) next to run 1, DroneCrowd test, 30 clips, no CMC, no
+  altitude scaling. Count error, mean over clips: unfiltered 35.2% (run 1: 48.5%), >=45-frame filtered 37.9%
+  (run 1: 38.7%), day-only filtered 35.2%, night clips unfiltered 18.2% and filtered 62.1%. TrackEval at IoU 0.5
+  (mean over clips): HOTA 0.300 (run 1: 0.298), DetA 0.251, AssA 0.382, IDF1 0.388 (0.384), MOTA 0.236,
+  5,439 ID switches (5,644); IDF1 0.448 at IoU 0.3. The longer miss limit mainly lowers the unfiltered count
+  (fewer ids created: 5,871 against 6,828 for 5,092 people); identity quality is essentially unchanged. Sign-off
+  reading as fixed before the run: filtered count error 37.9% is above the provisional 35% target (day-only
+  35.2%, also just above) with IDF1 reported; nothing is called pass or fail until the sheet is signed. The
+  DDCF trigger I set (filtered error above 35%) is met. The filtered view undercounts (3,455 ids for 5,092
+  people) while the unfiltered one overcounts (5,871), so an absolute-value mean hides opposite signs. Test
+  IDF1 is far below val (0.388 against 0.706) and DetA halves (0.251 against 0.496), in line with B's val-to-test
+  gap; per-clip IDF1 is lowest (0.04 to 0.07) on the clips where B finds few people (17, 18, 74, 108) and
+  highest (0.63 to 0.71) on 22, 23, 62, 75, 24. Per-clip table: `data/outputs/run_comparison/test_per_clip.csv`.
 
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each

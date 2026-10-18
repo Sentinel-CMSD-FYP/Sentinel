@@ -1,0 +1,15 @@
+# Config for the two DroneCrowd test runs scored with eval/trackeval_eval.py (decision 0009).
+# Run 1: the first test scoring (step-2 selection). Run 2: the frozen E-2 config ("second look, not
+# blind"). Both are scored with the same tool, thresholds and GT. Paths relative to the repo root.
+data_config: ml/configs/dronecrowd_data.yaml
+trackeval_path: ml/third_party/uav-dot-track/eval/TrackEval
+points_dir: data/outputs/points
+min_len_frames: 45
+sanity_clips: 3
+thresholds: [0.5, 0.3]            # IoU 0.5 primary, 0.3 secondary (about a 10 px offset)
+oracle_score_thr: [0.35]
+sanity_thresholds: [0.5]
+out_dir: data/outputs/trackeval
+trackers:
+  run1_step2_selected: ml/configs/tracker_selected.yaml     # score 0.35, min_hits 3, max_age 25 frames
+  run2_frozen_e2: ml/configs/tracker_e2_candidate.yaml      # score 0.35, min_hits 3, max_age 3.0 s

@@ -257,6 +257,11 @@ def main() -> None:
         raise SystemExit("the test split needs --allow-test (and counts as another look at test)")
 
     cfg = yaml.safe_load(args.config.read_text())
+    done = Path(cfg["out_dir"]) / args.split / ("results_oracle.json" if args.oracle
+                                                else "results.json")
+    if args.split == "test" and not args.sanity and done.exists():
+        raise SystemExit(f"{done} exists: this test result is not overwritten. Delete the file "
+                         "only if the run was invalid.")
     trackeval = load_trackeval(Path(cfg["trackeval_path"]))
     data_cfg = D.load_config(Path(cfg["data_config"]))
     points_dir = Path(cfg["points_dir"]) / args.split
@@ -267,8 +272,10 @@ def main() -> None:
     out_dir = Path(cfg["out_dir"]) / args.split
     key = "sanity_thresholds" if args.sanity else "thresholds"
     thresholds = [(f"iou_{t:g}", float(t)) for t in cfg[key]]
-    result: dict = {"split": args.split, "clips": sorted(docs),
-                    "note": "val is optimistic: B trained on these clips"}
+    note = ("val is optimistic: B trained on these clips" if args.split == "val" else
+            "test split: a second look is not blind (see docs/project-log.md); B's released "
+            "weights were probably selected using test frames")
+    result: dict = {"split": args.split, "clips": sorted(docs), "note": note}
     if args.sanity:
         sanity_clips = {c: gts[c] for c in sorted(gts)[: int(cfg["sanity_clips"])]}
         for label, thr in thresholds:
@@ -293,7 +300,8 @@ def main() -> None:
         for label, thr in thresholds:
             res = run_trackeval(trackeval, out_dir / "work", list(trackers), seqmap, thr)
             result[label] = res
-            print(f"--- {args.split} split, {len(docs)} clips, {label} (val is optimistic)")
+            print(f"--- {args.split} split, {len(docs)} clips, {label}"
+                  + (" (val is optimistic)" if args.split == "val" else ""))
             for name, s in res.items():
                 print(format_summary(name, s))
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -146,3 +146,19 @@ def test_oracle_with_perfect_detections_equals_the_ground_truth_rows():
     doc = {"frames": {str(f): [[x, y, 0.9] for x, y in pts] for f, (pts, _) in gt.items()}}
     rows = te.oracle_rows(doc, gt, score_thr=0.5)
     assert [r[:6] for r in rows] == [r[:6] for r in te.gt_rows(gt)]
+
+
+def test_a_test_result_is_not_overwritten(tmp_path, monkeypatch):
+    import yaml
+
+    cfg = {"out_dir": str(tmp_path / "out"), "trackeval_path": "unused", "data_config": "unused",
+           "points_dir": "unused", "thresholds": [0.5], "trackers": {}, "min_len_frames": 45}
+    cfg_path = tmp_path / "c.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg))
+    done = tmp_path / "out" / "test"
+    done.mkdir(parents=True)
+    (done / "results.json").write_text("{}")
+    monkeypatch.setattr(sys, "argv", ["trackeval_eval.py", "--config", str(cfg_path),
+                                      "--split", "test", "--allow-test"])
+    with pytest.raises(SystemExit, match="not overwritten"):
+        te.main()
