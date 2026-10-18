@@ -13,6 +13,8 @@ venv/
 apps/backend/staticfiles/
 apps/backend/media/
 
+.claude/
+
 # Node
 node_modules/
 apps/frontend/dist/
@@ -52,3 +54,9 @@ simulation/**/log/
 .idea/
 .DS_Store
 Thumbs.db
+
+CLAUDE.md
+ROADMAP.md
+docs/decisions/
+
+ml/third_party/

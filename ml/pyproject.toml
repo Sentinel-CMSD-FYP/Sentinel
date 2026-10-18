@@ -11,11 +11,12 @@ dependencies = [
     "numpy>=1.26",
     "opencv-python-headless>=4.9",
     "pyyaml>=6.0",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
-eval = ["scipy>=1.11"]  # reads DroneCrowd .mat annotations in eval/
+eval = ["matplotlib>=3.8", "scipy>=1.11"]  # eval/ scripts: threshold-sweep plot (matplotlib), DroneCrowd .mat annotations (scipy)
 export = ["imageio-ffmpeg>=0.5"]  # H.264 video for the viewer; without it the video won't play
 
 [tool.setuptools.packages.find]
