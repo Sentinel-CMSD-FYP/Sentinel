@@ -127,3 +127,34 @@ export function drawTracks(
     ctx.stroke()
   }
 }
+
+/** Outline the hovered cell and label it next to the pointer; `lines` are the readings to show. */
+export function drawHover(
+  ctx: CanvasRenderingContext2D,
+  cell: { x: number; y: number; w: number; h: number },
+  lines: string[],
+  pointer: { x: number; y: number },
+  bounds: { w: number; h: number },
+): void {
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+  ctx.lineWidth = 1.5
+  ctx.strokeRect(cell.x + 0.75, cell.y + 0.75, cell.w - 1.5, cell.h - 1.5)
+  if (lines.length === 0) return
+  ctx.font = '600 13px system-ui, sans-serif'
+  const pad = 8
+  const lineH = 18
+  const boxW = Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2
+  const boxH = lines.length * lineH + pad * 2 - 4
+  const x = Math.min(Math.max(4, pointer.x + 14), bounds.w - boxW - 4)
+  const y = Math.min(Math.max(4, pointer.y + 14), bounds.h - boxH - 4)
+  ctx.fillStyle = 'rgba(2, 6, 23, 0.88)'
+  ctx.beginPath()
+  ctx.roundRect(x, y, boxW, boxH, 8)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  ctx.fillStyle = '#f1f5f9'
+  ctx.textBaseline = 'middle'
+  lines.forEach((l, i) => ctx.fillText(l, x + pad, y + pad + i * lineH + 7))
+}
