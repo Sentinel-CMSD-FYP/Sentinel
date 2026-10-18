@@ -45,14 +45,22 @@ export default function App() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
-      <header className="mb-5 flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-50">Sentinel</h1>
-        <span className="text-sm text-slate-400">Tier 1 viewer</span>
+      <header className="card mb-5 flex flex-wrap items-center gap-3 px-4 py-3">
+        <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 shadow-lg shadow-sky-500/20">
+          <svg viewBox="0 0 24 24" className="size-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+          </svg>
+        </div>
+        <div className="leading-tight">
+          <h1 className="text-lg font-semibold tracking-tight text-slate-50">Sentinel</h1>
+          <span className="text-xs text-slate-400">Crowd early-warning · Tier 1 viewer</span>
+        </div>
         {clips && clips.length > 0 && (
           <label className="ml-auto flex items-center gap-2 text-sm text-slate-300">
             Clip
             <select
-              className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
+              className="rounded-lg border border-white/10 bg-slate-950/70 px-3 py-1.5 text-slate-100 outline-none focus:border-sky-400"
               value={selectedId ?? ''}
               onChange={(e) => setSelectedId(e.target.value)}
             >
@@ -73,7 +81,7 @@ export default function App() {
       )}
 
       {clips?.length === 0 && !error && (
-        <p className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-slate-300">
+        <p className="card p-4 text-slate-300">
           The backend has no clips yet. Generate a fake one with{' '}
           <code className="rounded bg-slate-800 px-1">python docs/layers/make_sample_clip.py data/samples/demo_fake</code>.
         </p>
@@ -89,12 +97,21 @@ export default function App() {
               visible={visible}
               onStatus={setStatus}
             />
-            <p className="mt-2 text-sm text-slate-400">
-              {clip.name ?? clip.clip_id} · {clip.frame_size[0]}×{clip.frame_size[1]} · {clip.fps} fps · frame{' '}
-              {status.frame} of {clip.n_frames} · {(status.frame / clip.fps).toFixed(2)} s
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="mr-1 text-sm font-medium text-slate-200">{clip.name ?? clip.clip_id}</span>
+              {[
+                `${clip.frame_size[0]}×${clip.frame_size[1]}`,
+                `${clip.fps} fps`,
+                `frame ${status.frame} / ${clip.n_frames}`,
+                `${(status.frame / clip.fps).toFixed(2)} s`,
+              ].map((t) => (
+                <span key={t} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 tabular-nums text-slate-300">
+                  {t}
+                </span>
+              ))}
+            </div>
           </div>
-          <LayerPanel clip={clip} state={layerState} visible={visible} live={status.live} onToggle={toggle} />
+          <LayerPanel clip={clip} state={layerState} visible={visible} live={status.live} frame={status.frame} onToggle={toggle} />
         </div>
       )}
     </div>
