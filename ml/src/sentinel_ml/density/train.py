@@ -224,6 +224,11 @@ def save_atomic(obj, path: Path) -> None:
     tmp.replace(path)
 
 
+def out_of_patience(epoch: int, best_epoch: int, patience: int) -> bool:
+    """True when ``patience`` (> 0) epochs have passed since the best val MAE."""
+    return patience > 0 and epoch - best_epoch >= patience
+
+
 def train(cfg: dict, data_cfg: dict, out: Path, epochs: int, root: Path | None = None,
           init_weights: Path | None = None, device: str = "auto", limit: int | None = None,
           time_limit_h: float | None = None) -> None:
@@ -307,6 +312,10 @@ def train(cfg: dict, data_cfg: dict, out: Path, epochs: int, root: Path | None =
                                     for k in HISTORY_FIELDS])
         save_atomic({"epoch": epoch, "model": model.state_dict(), "optimizer": opt.state_dict(),
                      "best": best, "config": cfg}, last)
+        if out_of_patience(epoch, best["epoch"], int(cfg.get("patience", 0))):
+            print(f"early stop after epoch {epoch}: no val MAE gain for {cfg['patience']} epochs",
+                  flush=True)
+            break
     print(f"best val MAE {best['val_mae']:.2f} at epoch {best['epoch']}", flush=True)
 
 

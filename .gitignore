@@ -52,3 +52,5 @@ simulation/**/log/
 .idea/
 .DS_Store
 Thumbs.db
+# Claude roadmap (local only)
+CLAUDE.md

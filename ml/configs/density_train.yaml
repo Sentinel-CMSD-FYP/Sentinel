@@ -13,3 +13,4 @@ num_workers: 4          # Kaggle kernels have 4 CPUs
 log_every: 50           # steps between running loss prints
 seed: 0
 time_limit_h: 11.0      # no new epoch past this, so a 12 h Kaggle session can save and exit
+patience: 4             # early stop after this many epochs without a new best val MAE (0 = off)

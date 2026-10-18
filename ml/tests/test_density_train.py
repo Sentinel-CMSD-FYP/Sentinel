@@ -12,6 +12,7 @@ from sentinel_ml.density.train import (
     OTLoss,
     collate,
     discrete_map,
+    out_of_patience,
     sinkhorn,
     train_epoch,
 )
@@ -103,3 +104,9 @@ def test_train_epoch_runs_and_returns_losses():
 def test_repo_root_points_at_configs():
     from sentinel_ml.density.train import TRAIN_CONFIG
     assert Path(TRAIN_CONFIG).exists()
+
+
+def test_out_of_patience_counts_epochs_since_best():
+    assert not out_of_patience(epoch=5, best_epoch=2, patience=4)
+    assert out_of_patience(epoch=6, best_epoch=2, patience=4)
+    assert not out_of_patience(epoch=50, best_epoch=2, patience=0)  # 0 = off

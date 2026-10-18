@@ -86,12 +86,12 @@ This file is like a Roadmap, that we have to follow at all costs.
    * Run 1 or 2 epochs and confirm that the loss goes down and val MAE is computed.
    * Done when: the smoke run logs show the loss decreasing and the full run notebook/command is ready.
 
-9) **Full fine tune run (Kaggle)** [2-n1 part 2]
+9) (Done) **Full fine tune run (Kaggle)** [2-n1 part 2]
    * [ASK] Budget for the Kaggle GPU hours (shared weekly quota, also needed for Model C training later).
    * Launch the full run (resuming across sessions if needed), monitor it, and keep the best checkpoint by val MAE (weights gitignored, stored as Kaggle output/dataset).
    * Done when: the best checkpoint and the training curve are saved.
 
-10) **Evaluate fine tuned model + density decision** [2-7]
+10) (Done) **Evaluate fine tuned model + density decision** [2-7]
     * Rerun the bucket eval on test with the fine tuned weights, with zero shot and fine tuned results side by side in one table.
     * Decide whether DMCount meets the bucket targets, and whether to go density only for dense zones (as in the Phase 0 sheet). Note the weakest bucket. [ASK] The final decision is the user's.
     * Done when: the comparison table and the decision are recorded.

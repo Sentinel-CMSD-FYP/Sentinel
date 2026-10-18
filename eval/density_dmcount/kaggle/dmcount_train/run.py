@@ -5,7 +5,8 @@ private dataset sentinel-dmcount-ckpt (``push.py ckpt``); the next push attaches
 folder (last.pt, best.pth, history.csv) is copied to /kaggle/working/run and
 ``sentinel_ml.density.train`` resumes from last.pt. Without that dataset the run starts from
 the QNRF weights (fetched from the DM-Count GitHub repo); to start fresh, delete the dataset. Set EPOCHS to the total
-epoch to train up to; the train config stops before an epoch that would pass 11 h.
+epoch to train up to; the trainer stops before an epoch that would pass TIME_LIMIT_H and
+after `patience` epochs without a new best val MAE (density_train.yaml).
 
 Kaggle keeps no log or output of a cancelled run, so training runs under a watchdog
 (WATCHDOG_H): on timeout it is killed and the kernel still ends normally. Training output goes
@@ -23,9 +24,10 @@ from pathlib import Path
 INPUT = Path("/kaggle/input")
 WORK = Path("/kaggle/working")
 RUN = WORK / "run"
-EPOCHS = 2
+EPOCHS = 20  # cap; in step 9 the 3 h budget (TIME_LIMIT_H) ends the run first
 LIMIT = 0
-WATCHDOG_H = 11.5  # hard stop, so a stalled session still ends with its log
+TIME_LIMIT_H = 2.6  # no new epoch past this (trainer clock); ~5 min kernel start comes on top
+WATCHDOG_H = 2.85  # hard stop, so a stalled session still ends with its log
 WEIGHTS_URL = ("https://github.com/cvlab-stonybrook/DM-Count/raw/"
                "cc5f2132e0d1328909f31b6d665b8e0b15c30467/pretrained_models/model_qnrf.pth")
 
@@ -47,7 +49,8 @@ def main() -> None:
     urllib.request.urlretrieve(WEIGHTS_URL, weights)
 
     cmd = [sys.executable, "-m", "sentinel_ml.density.train", "--out", str(RUN),
-           "--epochs", str(EPOCHS), "--root", str(INPUT), "--init-weights", str(weights)]
+           "--epochs", str(EPOCHS), "--root", str(INPUT), "--init-weights", str(weights),
+           "--time-limit-h", str(TIME_LIMIT_H)]
     if LIMIT:
         cmd += ["--limit", str(LIMIT)]
     print("$", " ".join(cmd), flush=True)
