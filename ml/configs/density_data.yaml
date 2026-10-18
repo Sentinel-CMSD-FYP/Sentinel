@@ -1,0 +1,18 @@
+# DroneCrowd data for DM-Count (sentinel_ml.density.data). Paths are relative to the repo root.
+root: data/dronecrowd                          # local copy; Kaggle kernels pass /kaggle/input instead
+manifest: data/manifests/dronecrowd_split.json # frozen team split (seed 0, 10 val clips), decision 0002
+frame_stride:                                  # keep every Nth frame; a missing split uses all frames
+  train: 5                                     # 72 clips x 60 = 4,320 frames per epoch
+  val: 10                                      # 10 clips x 30 = 300 frames per val pass
+check_dir: data/outputs/density_gt_check
+targets:                                       # step 5: DM-Count point files and GT density maps (make_targets.py)
+  out_dir: data/dmcount                        # points/{split}/img*.npy and density/{split}/img*.npz, gitignored
+  image_size: [1920, 1080]                     # every DroneCrowd frame (step 3 inspect)
+  sigma: 4.0                                   # fixed Gaussian sigma in full res pixels
+  cell: 8                                      # map cell = DM-Count downsample ratio, so 240 x 135
+count_error:                                   # step 6: bucketed count error (eval/density_dmcount/count_error.py)
+  lighting_tags: data/manifests/lighting_tags.yaml
+  bin_cutoffs: [100, 200]                      # GT people per frame: sparse < 100, moderate 100 to 200, dense > 200 (decision 0005, fixed)
+  min_gt_for_pct: 10                           # frames with fewer GT people stay in MAE/RMSE but not in % error or bias
+  provisional_targets_pct: {sparse: 15, moderate: 15, dense: 25}  # draft Phase 0 sheet s4.2, reference only, never pass/fail
+  out_dir: data/outputs/density_count_error    # <out_dir>/<run name>/<split>/

@@ -16,6 +16,8 @@ This file is like a Roadmap, that we have to follow at all costs.
 
 ## Rules:
 
+0) Avoid over-engineering, ensure YAGNI, keep things simple unless a problem demands a complex solution, write code that is scalable, understandable, bug-free and secure. 
+
 1) No commits and push shall be done by claude, leave that to me, I will commit and push the work by myself.
 
 2) Ask questions from user (me) when you have to decide anything or when you hit any confusion, never assume anything by yourself. Ask questions with clarity and detail, so I can understand what's being asked easily.
@@ -48,7 +50,7 @@ This file is like a Roadmap, that we have to follow at all costs.
    * Clone github.com/cvlab-stonybrook/DM-Count, get the released weights (gitignored), run inference on one image, print the count and save a heat map overlay. Do this both locally (CPU) and on Kaggle.
    * Done when: the count is printed and the overlay is saved in both places. Setup errors and fixes are noted for the decisions log.
 
-3) **Dataset acquisition** (DroneCrowd and/or own footage)
+3) (Done) **Dataset acquisition** (DroneCrowd and/or own footage)
    * [ASK] DroneCrowd only / own internet footage only / both (e.g. DroneCrowd for train+test, own clips for qualitative checks)? Own footage needs head point annotation, so decide the scope first. Licence: DroneCrowd is academic and noncommercial.
    * [ASK] How to get DroneCrowd onto Kaggle: upload it as a private Kaggle Dataset (~11 GB), or reuse an existing Kaggle copy if its layout matches.
    * Local copy goes in gitignored `data/dronecrowd/`, with the same layout as the team's.
@@ -57,28 +59,28 @@ This file is like a Roadmap, that we have to follow at all costs.
    * Rerun the step 2 smoke test on one DroneCrowd frame (copy it to `data/samples/`, push the src dataset, push the kernel). Step 2 itself ran on the DM-Count example image.
    * Done when: the data is on disk and on Kaggle, the counts are verified, and a few sample images have been viewed (including night clips 70/71).
 
-4) **Splits + data loader** [2-2 part 1]
+4) (Done) **Splits + data loader** [2-2 part 1]
    * [ASK] Validation split: the team proposes ~10 train clips held out with a fixed seed, but the list is NOT agreed yet. Use the team's list and never pick our own. [ASK] Frame subsampling for training (all 300 frames per clip, or every kth)?
    * Rules: `val_data` is a copy of test, so never tune or select checkpoints on it. The test split is only for final numbers. Night clips stay in.
    * Write a loader class in `ml/src/sentinel_ml/density/` that returns (image, head points) per frame. Put the split files under `data/manifests/` (or in a config).
    * Done when: GT points are drawn on 5 images and line up with the people.
 
-5) **GT density maps / DMCount format targets** [2-2 part 2]
+5) (Done) **GT density maps / DMCount format targets** [2-2 part 2]
    * DMCount trains on points (OT loss), so export per frame point files in the format DMCount expects. Also generate Gaussian GT density maps ([ASK] fixed vs adaptive sigma) for visualisation and eval, and save them to disk once (gitignored).
    * Done when: an assert script confirms sum(map) ≈ number of points on every frame, and sample maps are visualised.
 
-6) **Bucketed count error eval script** [2-3]
-   * Count error = |pred − GT| / GT, split into buckets (e.g. <50, 50 to 200, >200). [ASK] Confirm the thresholds and which target applies to which bucket (≤15% / ≤25%). `eval/targets.yaml` is not on this branch.
+6) (Done) **Bucketed count error eval script** [2-3]
+   * Count error = |pred − GT| / GT, split into buckets (decided: decision 0005 bins <100, 100 to 200, >200). [ASK] Confirm the thresholds and which target applies to which bucket (≤15% / ≤25%). `eval/targets.yaml` is not on this branch.
    * Sparse bucket: MAE is the main number, and frames with <10 people are left out of the percentage. Report MAE (+ RMSE) for every bucket.
    * The script goes under `eval/density_dmcount/`, with unit tests on fake data with known answers in `ml/tests/`.
    * Done when: the tests pass and the script outputs a per bucket table (CSV/markdown).
 
-7) **Zero shot baseline on the test split** [2-5, DMCount only]
+7) (Done) **Zero shot baseline on the test split** [2-5, DMCount only]
    * Run the released weights on Kaggle over all test frames ([ASK] all 9000 frames or a fixed subsample) and log the per bucket errors in a table.
    * Expect poor results, because the weights were trained on ground level photos. This is the baseline, not the final number. Check for undercounting in dense zones.
    * Done when: the baseline table is saved with short notes.
 
-8) **Fine tune pipeline + smoke run (Kaggle)** [2-n1 part 1]
+8) (Done) **Fine tune pipeline + smoke run (Kaggle)** [2-n1 part 1]
    * Adapt DMCount training to the drone train split (dataset class, crop size, downsample ratio, LR, OT params), starting from the released weights. Select checkpoints only on OUR held out val clips.
    * Make training resumable (save the checkpoint + optimiser state every epoch), because of Kaggle's 12 h session limit.
    * Run 1 or 2 epochs and confirm that the loss goes down and val MAE is computed.

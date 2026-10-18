@@ -11,11 +11,12 @@ dependencies = [
     "numpy>=1.26",
     "opencv-python-headless>=4.9",
     "pyyaml>=6.0",
+    "scipy>=1.11",  # reads DroneCrowd .mat annotations (sentinel_ml.localization.data)
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
-eval = ["scipy>=1.11"]  # reads DroneCrowd .mat annotations in eval/
+eval = []  # kept so "ml[dev,eval]" installs still work
 # Locally install the CPU wheel first: pip install torch --index-url https://download.pytorch.org/whl/cpu
 density = ["torch>=2.2"]
 
