@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
+import { drawHover } from '../lib/draw'
 import { frameForTime, pickSample } from '../lib/frames'
+import { gridRender } from '../lib/layers'
 import { drawLayer } from '../lib/overlay'
+import { cellAt, fmt, readCell, unitLabel } from '../lib/readout'
 import type { Clip, IndexedLayer } from '../types'
 
 export interface StageStatus {
@@ -24,6 +27,7 @@ export function VideoStage({ clip, src, layers, visible, onStatus }: Props) {
   const redraw = useRef<() => void>(() => {})
   const latest = useRef({ clip, layers, visible, onStatus })
   const lastSig = useRef('')
+  const pointer = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     latest.current = { clip, layers, visible, onStatus }
@@ -60,6 +64,34 @@ export function VideoStage({ clip, src, layers, visible, onStatus }: Props) {
         if (key !== null) drawLayer(ctx, meta, indexed, key, frame, scale)
       }
 
+      const p = pointer.current
+      if (p) {
+        const fx = p.x / scale.sx
+        const fy = p.y / scale.sy
+        const lines: string[] = []
+        let box: { x: number; y: number; w: number; h: number } | null = null
+        for (const meta of clip.layers) {
+          const indexed = layers[meta.layer]
+          if (!visible[meta.layer] || !indexed || indexed.layer.type !== 'grid') continue
+          const cell = cellAt(indexed.layer, fx, fy)
+          if (!cell) continue
+          const cw = (indexed.layer.frame_size[0] / indexed.layer.grid.cols) * scale.sx
+          const ch = (indexed.layer.frame_size[1] / indexed.layer.grid.rows) * scale.sy
+          box ??= { x: cell.col * cw, y: cell.row * ch, w: cw, h: ch }
+          const key = pickSample(indexed.keys, frame, indexed.layer.max_age_frames)
+          const reading =
+            key === null
+              ? null
+              : readCell(indexed.layer.frames[String(key)], gridRender(meta, indexed.layer), cell.row, cell.col)
+          lines.push(
+            reading
+              ? `${meta.label}: ${fmt(reading.value)} ${unitLabel(indexed.layer.units)}${reading.heading ? ' ' + reading.heading : ''}`
+              : `${meta.label}: no data`,
+          )
+        }
+        if (box) drawHover(ctx, box, lines, p, { w, h })
+      }
+
       const sig = `${frame}|${JSON.stringify(live)}`
       if (sig !== lastSig.current) {
         lastSig.current = sig
@@ -80,6 +112,18 @@ export function VideoStage({ clip, src, layers, visible, onStatus }: Props) {
 
     const events = ['seeked', 'loadedmetadata', 'play', 'pause'] as const
     events.forEach((e) => video.addEventListener(e, draw))
+    const move = (e: PointerEvent) => {
+      const r = canvas.getBoundingClientRect()
+      pointer.current = { x: e.clientX - r.left, y: e.clientY - r.top }
+      draw()
+    }
+    const leave = () => {
+      pointer.current = null
+      draw()
+    }
+    const host = canvas.parentElement
+    host?.addEventListener('pointermove', move)
+    host?.addEventListener('pointerleave', leave)
     const resize = new ResizeObserver(draw)
     resize.observe(canvas)
     draw()
@@ -88,6 +132,8 @@ export function VideoStage({ clip, src, layers, visible, onStatus }: Props) {
       if (hasRvfc) video.cancelVideoFrameCallback(handle)
       else cancelAnimationFrame(handle)
       events.forEach((e) => video.removeEventListener(e, draw))
+      host?.removeEventListener('pointermove', move)
+      host?.removeEventListener('pointerleave', leave)
       resize.disconnect()
       redraw.current = () => {}
     }
@@ -103,7 +149,7 @@ export function VideoStage({ clip, src, layers, visible, onStatus }: Props) {
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-lg bg-black"
+      className="relative w-full overflow-hidden rounded-2xl bg-black shadow-2xl shadow-black/50 ring-1 ring-white/10"
       style={{ aspectRatio: `${clip.frame_size[0]} / ${clip.frame_size[1]}` }}
     >
       <video ref={videoRef} src={src} controls playsInline preload="auto" className="absolute inset-0 h-full w-full" />
