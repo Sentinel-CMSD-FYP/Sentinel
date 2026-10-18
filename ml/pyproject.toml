@@ -17,7 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
 eval = ["matplotlib>=3.8", "scipy>=1.11"]  # eval/ scripts: threshold-sweep plot (matplotlib), DroneCrowd .mat annotations (scipy)
-
+export = ["imageio-ffmpeg>=0.5"]  # H.264 video for the viewer; without it the video won't play
 
 [tool.setuptools.packages.find]
 where = ["src"]
