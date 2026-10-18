@@ -275,6 +275,9 @@ def main() -> None:
     note = ("val is optimistic: B trained on these clips" if args.split == "val" else
             "test split: a second look is not blind (see docs/project-log.md); B's released "
             "weights were probably selected using test frames")
+    if args.oracle:
+        note = ("oracle on " + args.split + ", measurement only: it uses ground-truth identities, "
+                "so it is not a tracker; " + note)
     result: dict = {"split": args.split, "clips": sorted(docs), "note": note}
     if args.sanity:
         sanity_clips = {c: gts[c] for c in sorted(gts)[: int(cfg["sanity_clips"])]}
@@ -301,7 +304,8 @@ def main() -> None:
             res = run_trackeval(trackeval, out_dir / "work", list(trackers), seqmap, thr)
             result[label] = res
             print(f"--- {args.split} split, {len(docs)} clips, {label}"
-                  + (" (val is optimistic)" if args.split == "val" else ""))
+                  + (" (val is optimistic)" if args.split == "val" else "")
+                  + (" [oracle on " + args.split + ", measurement only]" if args.oracle else ""))
             for name, s in res.items():
                 print(format_summary(name, s))
     out_dir.mkdir(parents=True, exist_ok=True)

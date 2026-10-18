@@ -302,6 +302,26 @@ provisional and nothing is marked pass or fail.
   gap; per-clip IDF1 is lowest (0.04 to 0.07) on the clips where B finds few people (17, 18, 74, 108) and
   highest (0.63 to 0.71) on 22, 23, 62, 75, 24. Per-clip table: `data/outputs/run_comparison/test_per_clip.csv`.
 
+- Decision rule written before running the oracle on test (measurement only): perfect association on B's
+  test points at score 0.35, frozen config unchanged (hash verified). DDCF is built only if the oracle's mean
+  IDF1 (IoU 0.5, 30 test clips) is at least 0.15 above run 2's 0.388; otherwise not. The oracle uses
+  ground-truth identities, so it is not a tracker and is labelled "oracle on test, measurement only". It is
+  the third scoring of the test split (run 1, run 2, oracle) and nothing is changed afterwards.
+
+- Oracle on test, measurement only (third scoring of the test split; the oracle uses ground-truth identities, is
+  not a tracker, and is not a result of mine). Perfect association on B's test points at score 0.35, frozen
+  config unchanged: mean IDF1 0.454 against run 2's 0.388 (+0.066), HOTA 0.335 against 0.300, AssA 0.456 against
+  0.382, DetA 0.257 against 0.251, ID switches 1,371 against 5,439; at IoU 0.3 IDF1 0.512 against 0.448. The rule
+  I set before running (DDCF built only if the gain is at least 0.15 IDF1) says do not build: no clip reaches
+  +0.15 (largest +0.130, median +0.060), and on clips 17, 18, 74 and 108 even the oracle scores IDF1 0.045 to
+  0.090 because B finds almost nobody there. Association was never the bottleneck on test; Model B's detections
+  are (DetA 0.25 on test against 0.50 on val). DDCF is not built.
+- Where this leaves the work: accept and report the limitation for the tracker (run 2 filtered count error 37.9%
+  against the provisional 35%, IDF1 0.388, HOTA 0.300, the shortfall set by B's detections on night, dusk and
+  large-scale clips), and treat improving B as the next investment, scoped before any GPU hours are spent
+  (training on the 72 train clips would also give a clean val). E-4 (ID-stability clips) and E-5 (B+E speed on
+  the 4070) are still to do, then integration.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.
