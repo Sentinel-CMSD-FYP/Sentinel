@@ -117,6 +117,13 @@ existing layer unless `--replace` is given, and `--remove NAME` takes a layer ou
 visible and dots and tracks start hidden (`--visible` / `--hidden` override), and a grid with `u` and `v`
 fields is drawn as arrows, any other grid as a heatmap of its first field (`--field` picks another).
 
+Models B and E can hand over their files exactly as `docs/contracts.md` v1.0 defines them. `add_layer.py`
+recognises that format (a string `schema_version` of `"1.0"` and no `type`), takes the layer type from the
+file name (`<clip>_points.json`, `<clip>_tracks.json`, or `--kind`), and sets `max_age_frames` from the
+file's `frame_stride` (`--max-age` overrides). Their extra header fields (`fps`, `frame_stride`,
+`altitude_m`, `altitude_source`) are kept, and every other check above still applies. If their
+`clip_id` differs from the clip folder's (for example `clip_011` and `dc_011`), add `--fix-clip-id`.
+
 The fake clip (`make_sample_clip.py`) is generated, not committed (`data/` is gitignored). It is
 simulated crowd data, not model output, with a deliberate gap in the flow layer (frames 100 to 149)
 to exercise the gaps rule. Its video shows what the layers describe, so overlays line up.
