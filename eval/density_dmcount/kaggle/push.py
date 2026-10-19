@@ -6,7 +6,9 @@ Dataset ``<user>/sentinel-ml-src``, which kernels attach as an input.
 
     python eval/density_dmcount/kaggle/push.py src -m "what changed"
     python eval/density_dmcount/kaggle/push.py kernel dmcount_smoke
+    python eval/density_dmcount/kaggle/push.py kernel eval/infrastructure_yolo26/kaggle/yolo26_smoke
     python eval/density_dmcount/kaggle/push.py ckpt runs/kaggle/dmcount_train/v4 -m "epoch 2"
+    python eval/density_dmcount/kaggle/push.py labels -m "batch 1 labels + batch 2 images"
     kaggle kernels status <user>/sentinel-dmcount-smoke
     kaggle kernels output <user>/sentinel-dmcount-smoke -p runs/kaggle/dmcount_smoke
 
@@ -33,9 +35,11 @@ REPO = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
 SRC_SLUG = "sentinel-ml-src"
 CKPT_SLUG = "sentinel-dmcount-ckpt"
+LABELS_SLUG = "sentinel-infra-labels"
+LABELS_DIR = REPO / "data" / "infra_labels"
 # Copied into the dataset, relative to the repo root.
-SRC_PATHS = ["ml/pyproject.toml", "ml/src", "ml/configs", "eval/density_dmcount", "data/samples",
-             "data/manifests"]
+SRC_PATHS = ["ml/pyproject.toml", "ml/src", "ml/configs", "eval/density_dmcount",
+             "eval/infrastructure_yolo26", "data/samples", "data/manifests"]
 SKIP = shutil.ignore_patterns("__pycache__", "*.egg-info", "*.pyc", ".pytest_cache", "kaggle")
 
 
@@ -98,9 +102,22 @@ def push_ckpt(output_dir: Path, message: str) -> None:
         upload_dataset(stage, CKPT_SLUG, message)
 
 
+def push_labels(message: str) -> None:
+    """Upload the Model C images and YOLO labels (``data/infra_labels``) as the labels dataset."""
+    with tempfile.TemporaryDirectory() as tmp:
+        stage = Path(tmp) / "labels"
+        for sub, pattern in (("images", "*.jpg"), ("labels", "*.txt")):
+            (stage / sub).mkdir(parents=True)
+            for p in (LABELS_DIR / sub).glob(pattern):
+                shutil.copy2(p, stage / sub / p.name)
+        upload_dataset(stage, LABELS_SLUG, message)
+
+
 def push_kernel(name: str) -> None:
+    """Push a kernel folder: a name next to this script, or a path to a folder."""
     user = kaggle_user()
-    src = HERE / name
+    src = Path(name) if Path(name).is_dir() else HERE / name
+    name = src.name
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / name
         shutil.copytree(src, stage)
@@ -123,14 +140,18 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("src", help="create or update the private code dataset")
     s.add_argument("-m", "--message", default="update")
-    k = sub.add_parser("kernel", help="push and run a kernel folder next to this script")
+    k = sub.add_parser("kernel", help="push and run a kernel folder (name here, or a path)")
     k.add_argument("name")
     c = sub.add_parser("ckpt", help="upload a downloaded training run folder as the ckpt dataset")
     c.add_argument("output_dir", type=Path, help="folder holding run/ (kaggle kernels output)")
     c.add_argument("-m", "--message", default="update")
+    lb = sub.add_parser("labels", help="upload Model C images + YOLO labels as a dataset")
+    lb.add_argument("-m", "--message", default="update")
     args = ap.parse_args()
     if args.cmd == "src":
         push_src(args.message)
+    elif args.cmd == "labels":
+        push_labels(args.message)
     elif args.cmd == "ckpt":
         push_ckpt(args.output_dir, args.message)
     else:

@@ -1,0 +1,11 @@
+<!-- Label Studio labelling interface for Model C (paste into Project settings, Labeling Interface, Code).
+     Label values must match `classes` in ml/configs/infrastructure_yolo26.yaml. Rules: LABELLING.md. -->
+<View>
+  <Image name="image" value="$image" zoom="true" zoomControl="true" rotateControl="false"/>
+  <PolygonLabels name="label" toName="image" strokeWidth="2" pointSize="small" opacity="0.4">
+    <Label value="gate_exit" background="#00c853" hotkey="1"/>
+    <Label value="barrier" background="#ffab00" hotkey="2"/>
+    <Label value="wall" background="#2962ff" hotkey="3"/>
+    <Label value="obstruction" background="#d50000" hotkey="4"/>
+  </PolygonLabels>
+</View>

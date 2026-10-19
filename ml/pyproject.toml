@@ -19,6 +19,8 @@ dev = ["pytest>=8", "ruff>=0.5"]
 eval = []  # kept so "ml[dev,eval]" installs still work
 # Locally install the CPU wheel first: pip install torch --index-url https://download.pytorch.org/whl/cpu
 density = ["torch>=2.2"]
+# YOLO26 (Model C); pulls torchvision, matplotlib, polars
+infra = ["ultralytics>=8.4"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
