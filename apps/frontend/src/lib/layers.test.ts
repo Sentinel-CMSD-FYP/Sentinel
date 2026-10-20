@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GridLayer, LayerMeta, TracksLayer } from '../types'
-import { buildTrails, fieldMax, gridRender, indexLayer, maxSpeed } from './layers'
+import type { GridLayer, LayerMeta, PolygonsLayer, TracksLayer } from '../types'
+import { buildTrails, countByClass, fieldMax, gridRender, indexLayer, maxSpeed } from './layers'
 
 function grid(fields: string[], frames: GridLayer['frames']): GridLayer {
   return {
@@ -79,5 +79,23 @@ describe('buildTrails', () => {
     expect(t.get(1)).toEqual([[12, 10], [14, 10]])
     expect(t.has(99)).toBe(false)
     expect([...t.values()].flat().some(([x]) => x === 99)).toBe(false)
+  })
+})
+
+describe('countByClass', () => {
+  const obj = (cls: string) => ({ cls, score: 0.9, box: [0, 0, 1, 1] as [number, number, number, number], polygon: [] })
+  const layer: PolygonsLayer = {
+    schema_version: 1, clip_id: 'c', layer: 'infra', type: 'polygons', frame_size: [100, 100],
+    max_age_frames: 125, classes: ['wall', 'obstruction'], frames: {},
+  }
+
+  it('counts per class in class order, keeping classes with none', () => {
+    expect(countByClass(layer, [obj('obstruction'), obj('obstruction')])).toEqual([
+      ['wall', 0],
+      ['obstruction', 2],
+    ])
+  })
+  it('adds a class the layer does not list at the end', () => {
+    expect(countByClass(layer, [obj('tree')])).toEqual([['wall', 0], ['obstruction', 0], ['tree', 1]])
   })
 })

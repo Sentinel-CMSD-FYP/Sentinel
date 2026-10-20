@@ -51,3 +51,9 @@ def test_config_from_yaml():
     cfg = DMCountConfig.from_yaml(CONFIG)
     assert cfg.weights.endswith("finetune_e4.pth")
     assert cfg.device == "auto"
+
+
+def test_half_is_cuda_only():
+    m = DMCount(DMCountConfig(weights=None, device="cpu", half=True))
+    assert m.config.half and not m.half  # CPU always runs fp32
+    assert m.predict(np.zeros((64, 64, 3), dtype=np.uint8)).density.dtype == np.float32

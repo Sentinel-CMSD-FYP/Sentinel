@@ -78,3 +78,13 @@ def test_infrastructure_module_from_the_registry_runs_on_cpu():
     doc = layers["infrastructure"]
     assert doc["type"] == "polygons" and doc["frame_size"] == [320, 240]
     assert list(doc["frames"]) == ["0", "125"]  # every 125th frame (infrastructure_yolo26.yaml)
+
+
+def test_registry_overrides_replace_model_config_fields():
+    pytest.importorskip("torch")
+    with pytest.raises(TypeError):
+        build_module("density", device="cpu", no_such_field=1)
+    if not (REPO / "data" / "weights" / "dmcount" / "finetune_e4.pth").is_file():
+        pytest.skip("fine tuned DM-Count weights not on this machine")
+    module = build_module("density", device="cpu", half=True)
+    assert module.model.config.half and not module.model.half  # fp16 is CUDA only

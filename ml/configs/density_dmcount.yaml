@@ -4,3 +4,4 @@
 
 weights: data/weights/dmcount/finetune_e4.pth  # relative to the repo root
 device: auto                                   # cuda if available, else cpu
+half: true                                     # fp16 autocast on CUDA only; CPU stays fp32. Step 19: val MAE 15.37 as fp32, 2.3x faster on T4

@@ -70,6 +70,8 @@ class DMCountConfig:
     weights: str | None = None
     # "auto" picks CUDA when available, else CPU.
     device: str = "auto"
+    # fp16 autocast, applied on CUDA only (CPU always runs fp32).
+    half: bool = False
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> DMCountConfig:
@@ -99,6 +101,7 @@ class DMCount:
         if dev == "auto":
             dev = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(dev)
+        self.half = self.config.half and self.device.type == "cuda"
 
         self.model = DMCountNet()
         if self.config.weights is not None:
@@ -119,7 +122,8 @@ class DMCount:
 
     @torch.inference_mode()
     def predict(self, frame_bgr: np.ndarray) -> DensityMap:
-        mu, _ = self.model(self.preprocess(frame_bgr))
+        with torch.autocast(self.device.type, dtype=torch.float16, enabled=self.half):
+            mu, _ = self.model(self.preprocess(frame_bgr))
         density = mu[0, 0].float().cpu().numpy()
         return DensityMap(density=density, frame_shape=frame_bgr.shape[:2])
 

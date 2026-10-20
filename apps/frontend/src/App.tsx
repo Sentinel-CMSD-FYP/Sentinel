@@ -1,11 +1,43 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getClip, listClips, videoSrc } from './api'
 import { LayerPanel } from './components/LayerPanel'
-import { VideoStage, type StageStatus } from './components/VideoStage'
+import { Stage, type StageStatus } from './components/Stage'
+import type { ViewMode } from './lib/panels'
 import type { Clip, ClipSummary } from './types'
 import { useClipLayers } from './useClipLayers'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+function ModeSwitch({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
+  const options: [ViewMode, string][] = [
+    ['single', 'Single'],
+    ['split', 'Split by model'],
+  ]
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div role="group" aria-label="View" className="inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-1">
+        {options.map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={mode === m}
+            onClick={() => onChange(m)}
+            className={`rounded-lg px-3 py-1.5 text-sm transition ${
+              mode === m ? 'bg-sky-500 font-medium text-slate-950' : 'text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === 'split' && (
+        <span className="text-xs text-slate-500">
+          One panel per model, all on the same clock. The boxes on the right control the combined panel only.
+        </span>
+      )}
+    </div>
+  )
+}
 
 export default function App() {
   const [clips, setClips] = useState<ClipSummary[] | null>(null)
@@ -14,6 +46,7 @@ export default function App() {
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<StageStatus>({ frame: 0, live: {} })
   const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<ViewMode>('single')
 
   useEffect(() => {
     const ctl = new AbortController()
@@ -90,11 +123,13 @@ export default function App() {
       {clip && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div>
-            <VideoStage
+            <ModeSwitch mode={mode} onChange={setMode} />
+            <Stage
               clip={clip}
               src={videoSrc(clip)}
               layers={layerState.layers}
               visible={visible}
+              mode={mode}
               onStatus={setStatus}
             />
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">

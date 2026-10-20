@@ -3,6 +3,8 @@ import type {
   IndexedLayer,
   Layer,
   LayerMeta,
+  PolygonObject,
+  PolygonsLayer,
   TrackRow,
   TracksLayer,
 } from '../types'
@@ -57,6 +59,13 @@ export function maxSpeed(layer: GridLayer, uField: string, vField: string): numb
     if (typeof u === 'number' && typeof v === 'number') max = Math.max(max, Math.hypot(u, v))
   }
   return max
+}
+
+/** Objects per class in one sample, in the layer's class order (classes with none included). */
+export function countByClass(layer: PolygonsLayer, objects: PolygonObject[]): [string, number][] {
+  const counts = new Map(layer.classes.map((c) => [c, 0]))
+  for (const obj of objects) counts.set(obj.cls, (counts.get(obj.cls) ?? 0) + 1)
+  return [...counts]
 }
 
 /** Recent positions per track id, oldest first, for drawing trails. */

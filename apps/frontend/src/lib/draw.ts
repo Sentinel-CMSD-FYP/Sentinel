@@ -1,5 +1,5 @@
-import type { GridLayer, PointRow, TrackRow } from '../types'
-import { rampColour, rgba, trackColour } from './colour'
+import type { GridLayer, PolygonObject, PointRow, TrackRow } from '../types'
+import { classColour, rampColour, rgba, trackColour } from './colour'
 
 /** Canvas CSS pixels per original-frame pixel. */
 export interface Scale {
@@ -94,6 +94,31 @@ export function drawPoints(ctx: CanvasRenderingContext2D, rows: PointRow[], k: S
     ctx.fill()
     ctx.stroke()
   }
+}
+
+/** Each object as a lightly filled outline in its class colour. */
+export function drawPolygons(
+  ctx: CanvasRenderingContext2D,
+  classes: string[],
+  objects: PolygonObject[],
+  k: Scale,
+): void {
+  ctx.lineWidth = 2
+  ctx.lineJoin = 'round'
+  for (const obj of objects) {
+    if (obj.polygon.length < 3) continue
+    const colour = classColour(classes, obj.cls)
+    ctx.beginPath()
+    obj.polygon.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x * k.sx, y * k.sy) : ctx.lineTo(x * k.sx, y * k.sy)))
+    ctx.closePath()
+    ctx.globalAlpha = 0.22
+    ctx.fillStyle = colour
+    ctx.fill()
+    ctx.globalAlpha = 0.95
+    ctx.strokeStyle = colour
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
 }
 
 /** Faded trail per track id, then a dot at each track's latest position. */

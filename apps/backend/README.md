@@ -34,11 +34,26 @@ Not built yet: `POST /clips/<id>/layers/<layer>` (ingestion) and the live WebSoc
 ## Run models on a clip (`apps/pipeline`)
 
 ```powershell
-# from the repo root, in the repo .venv (it has sentinel_ml, CPU torch and ultralytics)
+# from the repo root, in the repo .venv (it has sentinel_ml, CPU torch, ultralytics, imageio-ffmpeg)
 pip install -r apps/backend/requirements.txt pytest-django
+pip install -e "ml[export]"   # ffmpeg for ingest_clip
 cd apps/backend
+# 1. make the clip: a mp4 file, or a folder of numbered frames (DroneCrowd)
+python manage.py ingest_clip ../../data/dronecrowd/test_data-001/test_data/images seq011 --seq 011 --fps 25 --name "DroneCrowd test 11"
+# 2. add the model layers
 python manage.py run_models seq011 --modules density,infrastructure [--device cpu] [--replace]
 ```
+
+`ingest_clip <source> <clip_id> [--seq] [--fps] [--name]` writes `<CLIPS_ROOT>/<clip_id>/` with
+`video.mp4` (frames piped once into ffmpeg: H.264, crf 18, yuv420p, faststart) and a `clip.json`
+with no layers. It refuses an existing clip folder, odd frame sizes (H.264 needs even ones) and a
+missing ffmpeg, and builds in a temporary folder, so a failed ingest leaves nothing behind. A frame
+folder has no frame rate, so pass `--fps` (default 30). crf 18 because the models decode this
+video: DM-Count counts on test clip 11 move 2.6% on average against the original jpgs at crf 18,
+4.7% at ffmpeg's default crf 23.
+
+On CPU (Ryzen 5 3600) clip 11 (300 frames, 1920x1080) takes 7 s to ingest, 48 s for `density`
+(12 samples) and 7 s for `infrastructure` (3 samples).
 
 It decodes `<CLIPS_ROOT>/<clip_id>/video.mp4` once (at most `n_frames` frames), gives every
 frame to every module, and adds each finished layer with `docs/layers/add_layer.py`. That checks
@@ -81,6 +96,10 @@ To add a model (B points, D flow, E tracks):
 <CLIPS_ROOT>/<clip_id>/video.mp4
 <CLIPS_ROOT>/<clip_id>/layers/<layer>.json
 ```
+
+The folder name and the `clip_id` inside `clip.json` must match. If you copy a clip folder, edit its
+`clip_id` too: a mismatched clip is left out of the list (a warning is logged) and its URLs return 404
+with a message saying so, instead of showing another clip's data.
 
 `CLIPS_ROOT` defaults to `data/samples/` in the repo (gitignored). Set the `CLIPS_ROOT` environment
 variable to use another folder. In Docker the data folder is not mounted yet, so mount one and set

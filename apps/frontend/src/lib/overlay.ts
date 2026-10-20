@@ -1,5 +1,5 @@
 import type { GridLayer, IndexedLayer, LayerMeta, PointRow, TrackRow, TracksLayer } from '../types'
-import { drawArrows, drawHeatmap, drawPoints, drawTracks, type Scale } from './draw'
+import { drawArrows, drawHeatmap, drawPoints, drawPolygons, drawTracks, type Scale } from './draw'
 import { buildTrails, fieldMax, gridRender, maxSpeed } from './layers'
 
 const TRAIL_FRAMES = 30
@@ -37,8 +37,11 @@ export function drawLayer(
     else drawHeatmap(ctx, layer, entry, mode.field, top, k)
   } else if (layer.type === 'points') {
     drawPoints(ctx, layer.frames[at] as PointRow[], k)
-  } else {
+  } else if (layer.type === 'tracks') {
     const tracks = layer as TracksLayer
     drawTracks(ctx, buildTrails(tracks, keys, frame, TRAIL_FRAMES), tracks.frames[at] as TrackRow[], k)
+  } else if (layer.type === 'polygons') {
+    drawPolygons(ctx, layer.classes, layer.frames[at], k)
   }
+  // Any other type (a newer contract than this viewer) draws nothing rather than breaking the page.
 }

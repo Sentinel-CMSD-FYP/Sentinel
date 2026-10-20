@@ -40,7 +40,7 @@ Shared rules (as in layers.md): original frame pixels, x = column, y = row, orig
 * Rate: every 125th frame (5 s at 25 fps), `max_age_frames` 125. Infrastructure is static (fixed camera), so it need not run every frame.
 * Model: fine tuned YOLO26s seg (step 14), imgsz 1280, conf 0.25, fp16 on CUDA, fp32 on CPU. A class wise NMS (box IoU 0.5) removes duplicate masks of one object (YOLO26 is NMS free). Val mask mAP50 0.318 without and 0.321 with this NMS (30 val images, `eval/infrastructure_yolo26/nms_check.py`). Weak classes: barrier and gate_exit are almost never found (too few labels), so the layer holds mostly wall and obstruction for now.
 * Each polygon is the largest connected part of its mask, simplified with a 1 px tolerance (about 20 points per object). Ultralytics' own `masks.xy` joins all parts with bridge lines that cross buildings, so it is not used.
-* Renderer needed (Mahid): draw each polygon outline (or fill) in a colour per class, optionally with `cls` and `score` on hover. Step 17 (2026.10.21) added the type to `docs/layers/check_layer.py`, `validate.py` and `schemas/` (`layer_polygons.schema.json`, `clip.schema.json` type enum), tests `ml/tests/test_layer_polygons.py`; Mahid to review.
+* Renderer: done in step 18 (2026.10.21), `drawPolygons` in `apps/frontend/src/lib/draw.ts` (filled outline, colour per class by `classes` order) plus per class counts in the layer panel; no hover readout yet. Step 17 (2026.10.21) added the type to `docs/layers/check_layer.py`, `validate.py` and `schemas/` (`layer_polygons.schema.json`, `clip.schema.json` type enum), tests `ml/tests/test_layer_polygons.py`; Mahid to review.
 
 ## Python API
 

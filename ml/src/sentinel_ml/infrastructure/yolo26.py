@@ -96,10 +96,10 @@ class InfraModel:
         if dev == "auto":
             dev = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = YOLO(str(config.weights))
-        half = config.half and dev.startswith("cuda")
+        self.half = config.half and dev.startswith("cuda")
         # quantize=16 is fp16 (Ultralytics 8.4 deprecates half=True).
         self._kw = {"imgsz": config.imgsz, "conf": config.conf, "device": dev,
-                    "quantize": 16 if half else None, "verbose": False}
+                    "quantize": 16 if self.half else None, "verbose": False}
 
     def predict(self, frame_bgr: np.ndarray) -> list[dict]:
         import torch

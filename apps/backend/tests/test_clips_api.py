@@ -125,3 +125,42 @@ def test_video_missing_is_404(client):
 def test_cors_allows_the_frontend_dev_server(client):
     r = client.get("/api/v1/health", headers={"Origin": "http://localhost:5173"})
     assert r["Access-Control-Allow-Origin"] == "http://localhost:5173"
+
+
+def _copy_demo_as(clips_root, name):
+    """A copied folder whose clip.json still says 'demo', the mistake this guards against."""
+    import shutil
+
+    shutil.copytree(clips_root / "demo", clips_root / name)
+
+
+def test_a_folder_whose_clip_json_names_another_clip_is_not_listed(client, clips_root, caplog):
+    _copy_demo_as(clips_root, "demo_copy")
+    with caplog.at_level("WARNING"):
+        listed = [c["clip_id"] for c in client.get("/api/v1/clips").json()]
+    assert listed.count("demo") == 1 and "demo_copy" not in listed
+    assert "demo_copy" in caplog.text
+
+
+def test_a_mismatched_clip_is_refused_everywhere_with_a_clear_message(client, clips_root):
+    _copy_demo_as(clips_root, "demo_copy")
+    for url in ("", "/video", "/layers/flow"):
+        r = client.get(f"/api/v1/clips/demo_copy{url}")
+        assert r.status_code == 404
+        assert "clip_id" in r.json()["detail"] and "demo_copy" in r.json()["detail"]
+
+
+def test_the_original_clip_still_works_beside_a_bad_copy(client, clips_root):
+    _copy_demo_as(clips_root, "demo_copy")
+    assert client.get("/api/v1/clips/demo").status_code == 200
+    assert client.get("/api/v1/clips/demo/layers/flow").status_code == 200
+
+
+def test_a_clip_json_with_no_clip_id_is_refused(client, clips_root):
+    import json
+
+    path = clips_root / "demo" / "clip.json"
+    doc = json.loads(path.read_text())
+    del doc["clip_id"]
+    path.write_text(json.dumps(doc))
+    assert client.get("/api/v1/clips/demo").status_code == 404

@@ -1,6 +1,6 @@
 # DMCount: crowd density model (Sentinel Tier 1, Model A)
 
-Branch `density-dmcount`. Owner: Ahmar. Status on 2026.10.19: set up, fine tuned on DroneCrowd, evaluated on the full test split, density decision made. Step 16 (2026.10.20) added the layer output wrapper; backend and FPS are still to come.
+Branch `density-dmcount`. Owner: Ahmar. Status on 2026.10.19: set up, fine tuned on DroneCrowd, evaluated on the full test split, density decision made. Step 16 (2026.10.20) added the layer output wrapper; steps 17 to 19 the backend and FPS. The Tier 1 results and decisions for Models A and C are summarised in `docs/decisions/0007-models-a-c-tier1-results.md`.
 
 ## 1. Summary
 
@@ -43,6 +43,7 @@ def zone_count(x0, y0, x1, y1):            # zone in input pixels
 * The output is a density map, not points: there are no per person positions or ids. Tracking and person points come from Model B.
 * Backend output (step 16): `sentinel_ml.density.density_layer` turns frames into a `grid` layer `density` (people per 120 px zone, 9x16 by default, 1 Hz) as in Mahid's layer contract. Format, sample and API: `docs/layers_density_infrastructure.md`, sample `docs/samples/seq011/density.json`.
 * Backend (step 17): `DensityModule` (same file) is Model A behind the common module interface `sentinel_ml.pipeline.Module`; the backend runs it with `python manage.py run_models <clip> --modules density` (`apps/backend/README.md`).
+* End to end (step 18): `manage.py ingest_clip` makes the clip (H.264 crf 18), then `run_models` adds the layer and the frontend shows it (single and split view). Counts from the decoded video differ from the jpg based eval by 2.6% on average (max 5.1%, bias -1.1%) on test clip 11, because DM-Count sees compressed frames; the step 10 numbers are on jpgs.
 
 ### Weights
 
@@ -54,14 +55,17 @@ def zone_count(x0, y0, x1, y1):            # zone in input pixels
 * `ml/configs/density_dmcount.yaml` points `weights:` at `data/weights/dmcount/finetune_e4.pth` (local copy of `best.pth`, same md5) since step 16. Pass `--weights data/weights/dmcount/model_qnrf.pth` for the zero shot model.
 * Weights are gitignored (`*.pth`). Teammates get them from the Kaggle dataset (ask Ahmar for access) or from Ahmar directly.
 
-### Speed (measured so far)
+### Speed (step 19, Kaggle T4, one GPU)
 
-| where | resolution | time per frame |
+| setting | time per frame | FPS |
 |---|---|---|
-| Kaggle Tesla T4, fp32 | 1920x1080 | 370 ms (about 2.7 FPS), over 9000 test frames, includes JPEG decode |
-| local CPU (no CUDA, AMD RX 560 PC) | 1920x1080 | about 5.4 s |
+| T4 fp32, `DensityModule` (model + zone grid), frames in memory | 317 ms | 3.2 |
+| T4 fp16 (default on CUDA since step 19, `half: true`) | 140 ms | 7.1 |
+| local CPU (no CUDA, AMD RX 560 PC), fp32 | about 5.5 s | 0.18 |
 
-Proper FPS, fp16, lower resolution and concurrent stream tests are CLAUDE.md step 19. These are Kaggle numbers, not RTX 4070 numbers.
+* fp16 costs no accuracy: val MAE 15.37 in both, same per bucket errors (`data/outputs/density_count_error/finetune_e4_fp16/val/`). CPU always runs fp32.
+* 4 concurrent streams on one T4 (one process each, density at 1 Hz + Model C every 5 s, fp16): every stream processes 30 to 33 video FPS (>= 25 = keeps up with live video), GPU memory peak 7.5 GB (~1.9 GB per stream), GPU load 72%. fp32 cannot do it (18 FPS per stream at 4 streams).
+* Full table and caveats: `data/outputs/fps_bench/notes.md`. These are Kaggle numbers, not RTX 4070 numbers.
 
 ## 3. Data
 
@@ -126,6 +130,7 @@ Day only (27 clips): fine tuned sparse 10.2%, moderate 24.6%, dense 8.0%, overal
 | what | path |
 |---|---|
 | side by side tables | `data/outputs/density_count_error/compare_test.md`, `compare_val.md` |
+| FPS and streams (step 19) | `data/outputs/fps_bench/` (`notes.md`, `bench.md`, `*/result.json`) |
 | fine tuned results + notes | `data/outputs/density_count_error/finetune_e4/{val,test}/` (`count_error.*`, `frames.csv`, `preds.csv`), `finetune_e4/notes.md` |
 | fine tuned overlays | `finetune_e4/test/overlays/` (densest, per bin median, night clips, clip 17 overcount + its GT points) |
 | zero shot results + notes | `data/outputs/density_count_error/zeroshot_qnrf/{val,test}/`, `zeroshot_qnrf/notes.md` |
@@ -166,6 +171,6 @@ Local setup: `python -m venv .venv`, then `pip install -e "ml[dev,eval]" kaggle`
 ## 9. Open items for integration and Tier 2
 
 * Step 16 done (2026.10.20): grid layer wrapper, config switched to `finetune_e4`. Still open: Mahid / Ahmed to confirm the format in `docs/layers_density_infrastructure.md`; per zone dense thresholds (the > 200 rule is per frame) are a Tier 2 risk choice.
-* Step 19: FPS on Kaggle at full res vs fp16 vs lower resolution, and 3 to 4 concurrent streams with memory.
+* Step 19 done (2026.10.21): fp16 default on CUDA, 4 streams fit on one T4 (see Speed). Open: B, D, E alongside, latency and real time paced streams (step 29).
 * Tier 2 gaps: scale augmentation or multi scale training for low altitude views (clips 17/18), low light augmentation or data for night, LR decay or a larger/averaged val (noisy val curve), own drone footage at 40 to 80 m for visual checks.
 * Deferred: DOT density head as an alternative to benchmark against DMCount.

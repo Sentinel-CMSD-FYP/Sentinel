@@ -38,7 +38,7 @@ CKPT_SLUG = "sentinel-dmcount-ckpt"
 LABELS_SLUG = "sentinel-infra-labels"
 LABELS_DIR = REPO / "data" / "infra_labels"
 # Copied into the dataset, relative to the repo root.
-SRC_PATHS = ["ml/pyproject.toml", "ml/src", "ml/configs", "eval/density_dmcount",
+SRC_PATHS = ["ml/pyproject.toml", "ml/src", "ml/configs", "eval/density_dmcount", "eval/pipeline",
              "eval/infrastructure_yolo26", "data/samples", "data/manifests"]
 SKIP = shutil.ignore_patterns("__pycache__", "*.egg-info", "*.pyc", ".pytest_cache", "kaggle")
 

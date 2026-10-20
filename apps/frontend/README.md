@@ -35,7 +35,7 @@ browser sees one origin. For a build served from elsewhere, set `VITE_API_URL` t
    (`round(time * fps)`) and draws each visible layer's sample for that frame on a canvas laid
    exactly over the video.
 
-Three renderers cover every layer, as in `docs/layers/README.md`:
+Four renderers cover every layer, as in `docs/layers/README.md`:
 
 | layer type | drawn as |
 |---|---|
@@ -43,6 +43,9 @@ Three renderers cover every layer, as in `docs/layers/README.md`:
 | `grid` otherwise | heatmap, colour scaled to the layer's maximum (density) |
 | `points` | dots, more opaque for higher score |
 | `tracks` | coloured dots with a short trail per track id |
+| `polygons` | lightly filled outlines, one colour per class (order of the layer's `classes`); the layer panel lists objects per class |
+
+A layer of any other type is listed but draws nothing, so a newer contract cannot break the page.
 
 The `style` hint in `clip.json` can override the grid choice (`{"render": "heatmap", "field": "..."}`).
 

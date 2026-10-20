@@ -54,6 +54,7 @@ def main() -> None:
     ap.add_argument("--model-config", type=Path, default=MODEL_CONFIG)
     ap.add_argument("--weights", type=Path, help="overrides the model config")
     ap.add_argument("--device", help="overrides the model config (cpu, cuda, auto)")
+    ap.add_argument("--half", action="store_true", help="fp16 autocast (CUDA only), step 19")
     ap.add_argument("--root", type=Path, help="dataset root, overrides the data config")
     ap.add_argument("--overlays", action="store_true", help="save a few heat map overlays")
     args = ap.parse_args()
@@ -66,13 +67,15 @@ def main() -> None:
         mcfg["weights"] = str(REPO / mcfg["weights"])
     if args.device:
         mcfg["device"] = args.device
+    if args.half:
+        mcfg["half"] = True
     model = DMCount(DMCountConfig(**mcfg))
 
     ds = load_split_from_config(cfg, args.split, root=args.root, repo=REPO)
     out = args.out / args.split
     out.mkdir(parents=True, exist_ok=True)
     print(f"{args.split}: {len(ds.refs)} frames, weights {Path(mcfg['weights']).name}, "
-          f"device {model.device}", flush=True)
+          f"device {model.device}, fp16 {model.half}", flush=True)
 
     rows, paths = [], {}
     t0 = time.perf_counter()

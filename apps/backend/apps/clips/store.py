@@ -28,6 +28,14 @@ class NotFound(Exception):
     """The clip, layer or video does not exist (or the name is not allowed)."""
 
 
+class ClipIdMismatch(NotFound):
+    """``clip.json`` names a different clip than its folder, e.g. a folder copied and renamed.
+
+    Everything is looked up by folder name but listed by the ``clip_id`` inside, so a mismatch
+    would show the wrong clip's data under another name. It is refused instead.
+    """
+
+
 @dataclass(frozen=True)
 class ClipStore:
     root: Path
@@ -44,6 +52,11 @@ class ClipStore:
         """The clip's ``clip.json``, with ``video_url`` set only if a video file exists."""
         path = self._clip_dir(clip_id)
         clip = json.loads((path / "clip.json").read_text(encoding="utf-8"))
+        if clip.get("clip_id") != clip_id:
+            raise ClipIdMismatch(
+                f"clip folder {clip_id!r} says clip_id {clip.get('clip_id')!r} in its clip.json; "
+                f"they must match (edit clip.json, or rename the folder)"
+            )
         if (path / "video.mp4").is_file():
             clip["video_url"] = f"/api/v1/clips/{clip_id}/video"
         else:
@@ -60,6 +73,9 @@ class ClipStore:
                 continue
             try:
                 clip = self.get_clip(child.name)
+            except ClipIdMismatch as e:
+                logger.warning("skipping clip: %s", e)
+                continue
             except NotFound:
                 continue
             except (OSError, ValueError):
@@ -86,6 +102,7 @@ class ClipStore:
         return path
 
     def video_path(self, clip_id: str) -> Path:
+        self.get_clip(clip_id)  # refuses a folder whose clip.json names another clip
         path = self._clip_dir(clip_id) / "video.mp4"
         if not path.is_file():
             raise NotFound(f"clip {clip_id!r} has no video")

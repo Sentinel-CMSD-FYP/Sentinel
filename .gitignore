@@ -58,6 +58,5 @@ Thumbs.db
 # Claude roadmap (local only)
 CLAUDE.md
 ROADMAP.md
-docs/decisions/
 
 ml/third_party/

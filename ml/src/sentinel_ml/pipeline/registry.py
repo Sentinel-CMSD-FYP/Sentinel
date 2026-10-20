@@ -25,23 +25,25 @@ def _from_repo(path: str) -> str:
     return str(p if p.is_absolute() else REPO / p)
 
 
-def _density(device: str | None) -> Module:
+def _density(device: str | None, **overrides) -> Module:
     from sentinel_ml.density import DensityLayerConfig, DensityModule, DMCount, DMCountConfig
 
     cfg = DMCountConfig.from_yaml(CONFIGS / "density_dmcount.yaml")
-    cfg = replace(cfg, weights=_from_repo(cfg.weights), device=device or cfg.device)
+    cfg = replace(cfg, device=device or cfg.device, **overrides)
+    cfg = replace(cfg, weights=_from_repo(cfg.weights))
     return DensityModule(DMCount(cfg), DensityLayerConfig.from_yaml(CONFIGS / "density_layer.yaml"))
 
 
-def _infrastructure(device: str | None) -> Module:
+def _infrastructure(device: str | None, **overrides) -> Module:
     from sentinel_ml.infrastructure import InfraConfig, InfraModel, InfraModule
 
     cfg = InfraConfig.from_yaml(CONFIGS / "infrastructure_yolo26.yaml")
-    cfg = replace(cfg, weights=_from_repo(cfg.weights), device=device or cfg.device)
+    cfg = replace(cfg, device=device or cfg.device, **overrides)
+    cfg = replace(cfg, weights=_from_repo(cfg.weights))
     return InfraModule(InfraModel(cfg))
 
 
-BUILDERS: dict[str, Callable[[str | None], Module]] = {
+BUILDERS: dict[str, Callable[..., Module]] = {
     "density": _density,
     "infrastructure": _infrastructure,
 }
@@ -51,8 +53,12 @@ def available() -> list[str]:
     return sorted(BUILDERS)
 
 
-def build_module(name: str, device: str | None = None) -> Module:
-    """The module called ``name``; ``device`` ("cpu", "cuda") overrides its config."""
+def build_module(name: str, device: str | None = None, **overrides) -> Module:
+    """The module called ``name``; ``device`` ("cpu", "cuda") overrides its config.
+
+    ``overrides`` replace fields of the model config, e.g. ``weights="/kaggle/input/.../best.pth"``
+    or ``half=False`` (an unknown field raises TypeError).
+    """
     if name not in BUILDERS:
         raise KeyError(f"unknown module {name!r}; available: {', '.join(available())}")
-    return BUILDERS[name](device)
+    return BUILDERS[name](device, **overrides)
