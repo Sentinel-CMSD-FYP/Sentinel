@@ -39,6 +39,10 @@ Not built yet: `POST /clips/<id>/layers/<layer>` (ingestion) and the live WebSoc
 <CLIPS_ROOT>/<clip_id>/layers/<layer>.json
 ```
 
+The folder name and the `clip_id` inside `clip.json` must match. If you copy a clip folder, edit its
+`clip_id` too: a mismatched clip is left out of the list (a warning is logged) and its URLs return 404
+with a message saying so, instead of showing another clip's data.
+
 `CLIPS_ROOT` defaults to `data/samples/` in the repo (gitignored). Set the `CLIPS_ROOT` environment
 variable to use another folder. In Docker the data folder is not mounted yet, so mount one and set
 `CLIPS_ROOT` to use real clips.
