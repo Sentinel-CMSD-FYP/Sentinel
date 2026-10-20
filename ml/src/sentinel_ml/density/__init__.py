@@ -7,9 +7,9 @@ from sentinel_ml.density.dmcount import (
     DMCountNet,
     overlay,
 )
-from sentinel_ml.density.layer import DensityLayerConfig, density_layer, zone_grid
+from sentinel_ml.density.layer import DensityLayerConfig, DensityModule, density_layer, zone_grid
 
 __all__ = [
-    "DMCount", "DMCountConfig", "DMCountNet", "DensityLayerConfig", "DensityMap", "density_layer",
-    "overlay", "zone_grid",
+    "DMCount", "DMCountConfig", "DMCountNet", "DensityLayerConfig", "DensityMap", "DensityModule",
+    "density_layer", "overlay", "zone_grid",
 ]

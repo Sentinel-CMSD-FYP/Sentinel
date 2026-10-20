@@ -53,29 +53,50 @@ def zone_grid(dm: DensityMap, rows: int, cols: int) -> tuple[np.ndarray, np.ndar
     return people.reshape(rows, cols), valid.reshape(rows, cols)
 
 
+class DensityModule:
+    """Model A behind the common interface (``sentinel_ml.pipeline.Module``).
+
+    ``process`` runs DM-Count only on frame ids that are a multiple of ``cfg.every``.
+    """
+
+    name = "density"
+
+    def __init__(self, model: DMCount, cfg: DensityLayerConfig | None = None) -> None:
+        self.model = model
+        self.cfg = cfg or DensityLayerConfig()
+        self._frame_size: list[int] | None = None
+        self._frames: dict[str, dict] = {}
+
+    def process(self, frame_id: int, frame: np.ndarray) -> None:
+        cfg = self.cfg
+        if frame_id % cfg.every:
+            return
+        size = [frame.shape[1], frame.shape[0]]
+        if self._frame_size is None:
+            self._frame_size = size
+        elif size != self._frame_size:
+            raise ValueError(f"frame {frame_id} is {size}, earlier frames are {self._frame_size}")
+        people, valid = zone_grid(self.model.predict(frame), cfg.rows, cfg.cols)
+        self._frames[str(frame_id)] = {"valid": valid.astype(int).tolist(),
+                                       "density": np.round(people, cfg.decimals).tolist()}
+
+    def layer(self, clip_id: str) -> dict:
+        cfg = self.cfg
+        if self._frame_size is None:
+            raise ValueError(f"no frame id is a multiple of every={cfg.every}")
+        return {"schema_version": 1, "clip_id": clip_id, "layer": self.name, "type": "grid",
+                "frame_size": self._frame_size, "grid": {"rows": cfg.rows, "cols": cfg.cols},
+                "units": "people_per_cell", "fields": ["density"],
+                "max_age_frames": cfg.max_age_frames, "frames": self._frames}
+
+
 def density_layer(frames: Iterable[tuple[int, np.ndarray]], model: DMCount, clip_id: str,
                   cfg: DensityLayerConfig | None = None) -> dict:
     """Run DM-Count on ``(frame_id, BGR frame)`` pairs and return the grid layer as a dict.
 
     Only frames whose id is a multiple of ``cfg.every`` are run; ids are 0 based clip indices.
     """
-    cfg = cfg or DensityLayerConfig()
-    frame_size = None
-    out: dict[str, dict] = {}
+    module = DensityModule(model, cfg)
     for fid, frame in frames:
-        if fid % cfg.every:
-            continue
-        size = [frame.shape[1], frame.shape[0]]
-        if frame_size is None:
-            frame_size = size
-        elif size != frame_size:
-            raise ValueError(f"frame {fid} is {size}, earlier frames are {frame_size}")
-        people, valid = zone_grid(model.predict(frame), cfg.rows, cfg.cols)
-        out[str(fid)] = {"valid": valid.astype(int).tolist(),
-                         "density": np.round(people, cfg.decimals).tolist()}
-    if frame_size is None:
-        raise ValueError(f"no frame id is a multiple of every={cfg.every}")
-    return {"schema_version": 1, "clip_id": clip_id, "layer": "density", "type": "grid",
-            "frame_size": frame_size, "grid": {"rows": cfg.rows, "cols": cfg.cols},
-            "units": "people_per_cell", "fields": ["density"],
-            "max_age_frames": cfg.max_age_frames, "frames": out}
+        module.process(fid, frame)
+    return module.layer(clip_id)

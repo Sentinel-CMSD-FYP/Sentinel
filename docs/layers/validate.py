@@ -20,6 +20,7 @@ _LAYER_SCHEMA = {
     "grid": "layer_grid.schema.json",
     "points": "layer_points.schema.json",
     "tracks": "layer_tracks.schema.json",
+    "polygons": "layer_polygons.schema.json",
 }
 
 
@@ -59,6 +60,18 @@ def validate_layer(doc: dict, n_frames: int | None = None) -> list[str]:
             extra = set(entry) - {"valid", *doc["fields"]}
             if extra:
                 errors.append(f"frame {fid}: unexpected fields {sorted(extra)}")
+        elif kind == "polygons":
+            for obj in entry:
+                x0, y0, x1, y1 = obj["box"]
+                if obj["cls"] not in doc["classes"]:
+                    errors.append(f"frame {fid}: cls {obj['cls']!r} is not one of classes")
+                    break
+                if not (0 <= x0 <= x1 <= w and 0 <= y0 <= y1 <= h):
+                    errors.append(f"frame {fid}: box {obj['box']} outside {w}x{h}")
+                    break
+                if not all(0 <= x < w and 0 <= y < h for x, y in obj["polygon"]):
+                    errors.append(f"frame {fid}: polygon point outside {w}x{h}")
+                    break
         else:
             xi = 0 if kind == "points" else 1
             for row in entry:

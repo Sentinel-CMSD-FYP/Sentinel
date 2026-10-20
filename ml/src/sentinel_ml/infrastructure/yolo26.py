@@ -130,26 +130,46 @@ class InfraModel:
         return out
 
 
+class InfraModule:
+    """Model C behind the common interface (``sentinel_ml.pipeline.Module``).
+
+    ``process`` runs the model only on frame ids that are a multiple of ``model.config.every``.
+    """
+
+    name = "infrastructure"
+
+    def __init__(self, model: InfraModel) -> None:
+        self.model = model
+        self._frame_size: list[int] | None = None
+        self._frames: dict[str, list] = {}
+
+    def process(self, frame_id: int, frame: np.ndarray) -> None:
+        if frame_id % self.model.config.every:
+            return
+        size = [frame.shape[1], frame.shape[0]]
+        if self._frame_size is None:
+            self._frame_size = size
+        elif size != self._frame_size:
+            raise ValueError(f"frame {frame_id} is {size}, earlier frames are {self._frame_size}")
+        self._frames[str(frame_id)] = self.model.predict(frame)
+
+    def layer(self, clip_id: str) -> dict:
+        cfg = self.model.config
+        if self._frame_size is None:
+            raise ValueError(f"no frame id is a multiple of every={cfg.every}")
+        return {"schema_version": 1, "clip_id": clip_id, "layer": self.name,
+                "type": "polygons", "frame_size": self._frame_size,
+                "classes": list(cfg.classes), "max_age_frames": cfg.max_age_frames,
+                "frames": self._frames}
+
+
 def infrastructure_layer(frames: Iterable[tuple[int, np.ndarray]], model: InfraModel,
                          clip_id: str) -> dict:
     """Run Model C on ``(frame_id, BGR frame)`` pairs and return the polygons layer as a dict.
 
     Only frames whose id is a multiple of ``model.config.every`` are run (0 based clip indices).
     """
-    cfg = model.config
-    frame_size = None
-    out: dict[str, list] = {}
+    module = InfraModule(model)
     for fid, frame in frames:
-        if fid % cfg.every:
-            continue
-        size = [frame.shape[1], frame.shape[0]]
-        if frame_size is None:
-            frame_size = size
-        elif size != frame_size:
-            raise ValueError(f"frame {fid} is {size}, earlier frames are {frame_size}")
-        out[str(fid)] = model.predict(frame)
-    if frame_size is None:
-        raise ValueError(f"no frame id is a multiple of every={cfg.every}")
-    return {"schema_version": 1, "clip_id": clip_id, "layer": "infrastructure",
-            "type": "polygons", "frame_size": frame_size, "classes": list(cfg.classes),
-            "max_age_frames": cfg.max_age_frames, "frames": out}
+        module.process(fid, frame)
+    return module.layer(clip_id)

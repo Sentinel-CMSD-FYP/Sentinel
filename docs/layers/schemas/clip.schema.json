@@ -20,7 +20,7 @@
         "required": ["layer", "type", "label"],
         "properties": {
           "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
-          "type": {"enum": ["grid", "points", "tracks"]},
+          "type": {"enum": ["grid", "points", "tracks", "polygons"]},
           "label": {"type": "string"},
           "units": {"type": "string"},
           "default_visible": {"type": "boolean"},

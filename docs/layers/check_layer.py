@@ -17,8 +17,8 @@ def check_layer(doc, n_frames=None):
     """Return a list of problems; an empty list means the layer is valid."""
     errs = []
     kind = doc.get("type")
-    if kind not in ("grid", "points", "tracks"):
-        return [f"type must be grid, points or tracks, got {kind!r}"]
+    if kind not in ("grid", "points", "tracks", "polygons"):
+        return [f"type must be grid, points, tracks or polygons, got {kind!r}"]
     if doc.get("schema_version") != 1:
         errs.append("schema_version must be 1")
     if not isinstance(doc.get("clip_id"), str) or not doc["clip_id"]:
@@ -51,6 +51,13 @@ def check_layer(doc, n_frames=None):
             fields = []
         if not isinstance(doc.get("units"), str):
             errs.append("units must be a string")
+    classes = []
+    if kind == "polygons":
+        classes = doc.get("classes")
+        if not (isinstance(classes, list) and classes and len(set(classes)) == len(classes)
+                and all(isinstance(c, str) and c for c in classes)):
+            errs.append("classes must be a non-empty list of unique names")
+            classes = []
 
     for key, entry in frames.items():
         tag = f"frame {key}"
@@ -76,6 +83,8 @@ def check_layer(doc, n_frames=None):
             extra = set(entry) - set(["valid"] + fields)
             if extra:
                 errs.append(f"{tag}: unexpected fields {sorted(extra)}")
+        elif kind == "polygons":
+            errs += check_objects(entry, tag, classes, w, h)
         else:
             n = 3 if kind == "points" else 4
             if not isinstance(entry, list):
@@ -99,6 +108,31 @@ def check_layer(doc, n_frames=None):
                         break
                     ids.add(row[0])
     return errs
+
+
+def check_objects(entry, tag, classes, w, h):
+    """Problems in one frame of a polygons layer (first problem per frame, like points)."""
+    if not isinstance(entry, list):
+        return [f"{tag}: must be a list of objects"]
+    for obj in entry:
+        if not (isinstance(obj, dict) and set(obj) == {"cls", "score", "box", "polygon"}):
+            return [f"{tag}: each object needs exactly cls, score, box and polygon"]
+        if obj["cls"] not in classes:
+            return [f"{tag}: cls {obj['cls']!r} is not one of classes"]
+        if not (num(obj["score"]) and 0 <= obj["score"] <= 1):
+            return [f"{tag}: score must be between 0 and 1"]
+        box = obj["box"]
+        if not (isinstance(box, list) and len(box) == 4 and all(num(v) for v in box)
+                and 0 <= box[0] <= box[2] <= w and 0 <= box[1] <= box[3] <= h):
+            return [f"{tag}: box must be [x0, y0, x1, y1] inside the {w}x{h} frame"]
+        poly = obj["polygon"]
+        if not (isinstance(poly, list) and len(poly) >= 3
+                and all(isinstance(p, list) and len(p) == 2 and all(num(v) for v in p)
+                        for p in poly)):
+            return [f"{tag}: polygon needs at least 3 [x, y] points"]
+        if not all(0 <= x < w and 0 <= y < h for x, y in poly):
+            return [f"{tag}: polygon has a point outside the {w}x{h} frame"]
+    return []
 
 
 if __name__ == "__main__":

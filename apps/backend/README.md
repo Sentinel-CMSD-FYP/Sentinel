@@ -31,6 +31,49 @@ if `clip.json` declares it. Errors are JSON, `{"detail": "..."}`, with status 40
 
 Not built yet: `POST /clips/<id>/layers/<layer>` (ingestion) and the live WebSocket.
 
+## Run models on a clip (`apps/pipeline`)
+
+```powershell
+# from the repo root, in the repo .venv (it has sentinel_ml, CPU torch and ultralytics)
+pip install -r apps/backend/requirements.txt pytest-django
+cd apps/backend
+python manage.py run_models seq011 --modules density,infrastructure [--device cpu] [--replace]
+```
+
+It decodes `<CLIPS_ROOT>/<clip_id>/video.mp4` once (at most `n_frames` frames), gives every
+frame to every module, and adds each finished layer with `docs/layers/add_layer.py`. That checks
+the layer against the contract and the clip and writes `layers/<name>.json` plus its entry in
+`clip.json`, so the API above serves it straight away. A layer the clip already has is refused
+before any frame is decoded, unless you pass `--replace`. Modules today: `density` (Model A, DM-Count,
+grid, every 25th frame) and `infrastructure` (Model C, YOLO26, polygons, every 125th frame).
+
+`sentinel_ml` is imported only by this command, so the API and its Docker image run without
+torch. The command's tests (`tests/test_run_models.py`) skip themselves where `sentinel_ml` is
+missing, as in CI.
+
+### The module interface (`ml/src/sentinel_ml/pipeline/`)
+
+Every model follows one interface, `sentinel_ml.pipeline.Module`:
+
+```python
+class Module(Protocol):
+    name: str                                          # layer name -> layers/<name>.json
+    def process(self, frame_id: int, frame: np.ndarray) -> None: ...  # every frame, BGR uint8
+    def layer(self, clip_id: str) -> dict: ...         # the finished layer (layer contract)
+```
+
+`run_clip(frames, modules, clip_id)` feeds `(frame_id, frame)` pairs, in order, to every module
+and returns `{name: layer}`. A module decides itself which frames it runs on and keeps any
+state it needs (previous frame for flow, tracks for tracking). Frame ids are 0 based.
+
+To add a model (B points, D flow, E tracks):
+
+1. Next to the model, write a class with `name`, `process` and `layer` (see `DensityModule` in
+   `ml/src/sentinel_ml/density/layer.py`, about 30 lines).
+2. Add a builder to `BUILDERS` in `ml/src/sentinel_ml/pipeline/registry.py` that loads it from
+   its config in `ml/configs/` (resolve weight paths with `_from_repo`).
+3. `python manage.py run_models <clip> --modules <name>`.
+
 ## Clips on disk
 
 ```

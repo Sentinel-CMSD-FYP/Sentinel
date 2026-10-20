@@ -42,6 +42,7 @@ def zone_count(x0, y0, x1, y1):            # zone in input pixels
 
 * The output is a density map, not points: there are no per person positions or ids. Tracking and person points come from Model B.
 * Backend output (step 16): `sentinel_ml.density.density_layer` turns frames into a `grid` layer `density` (people per 120 px zone, 9x16 by default, 1 Hz) as in Mahid's layer contract. Format, sample and API: `docs/layers_density_infrastructure.md`, sample `docs/samples/seq011/density.json`.
+* Backend (step 17): `DensityModule` (same file) is Model A behind the common module interface `sentinel_ml.pipeline.Module`; the backend runs it with `python manage.py run_models <clip> --modules density` (`apps/backend/README.md`).
 
 ### Weights
 
@@ -153,6 +154,8 @@ Day only (27 clips): fine tuned sparse 10.2%, moderate 24.6%, dense 8.0%, overal
 | `ml/src/sentinel_ml/density/data.py` | DroneCrowd split loading with strides |
 | `ml/src/sentinel_ml/density/targets.py` | `clip_points`, Gaussian GT `density_map` |
 | `ml/src/sentinel_ml/density/train.py` | fine tune (OT loss, Sinkhorn, resume, early stop) |
+| `ml/src/sentinel_ml/density/layer.py` | `zone_grid`, `DensityModule`, `density_layer` (grid layer output) |
+| `ml/src/sentinel_ml/pipeline/` | common module interface, runner, registry (step 17) |
 | `ml/configs/density_dmcount.yaml`, `density_data.yaml`, `density_train.yaml` | model, data/eval, training settings |
 | `ml/tests/test_density_*.py` | unit tests (73 pass with the localization tests: `python -m pytest ml/tests`) |
 | `eval/density_dmcount/` | smoke test, dataset checks, GT check, targets, predict, count error, compare, plot |
