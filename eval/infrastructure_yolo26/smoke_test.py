@@ -2,9 +2,9 @@
 
     python eval/infrastructure_yolo26/smoke_test.py data/samples/dronecrowd_img100001.jpg
 
-Runs the pretrained COCO segmentation weights from ``ml/configs/infrastructure_yolo26.yaml``
-on CPU locally and on the Kaggle GPU (see ``kaggle/``). It only checks the install;
-the COCO classes are not our infrastructure classes.
+Runs the weights from ``ml/configs/infrastructure_yolo26.yaml`` (the fine tuned Model C since
+step 15) on CPU locally and on the Kaggle GPU (see ``kaggle/``). Step 11 ran it with the COCO
+model (``--weights data/weights/yolo26/yolo26s-seg.pt``) to check the install.
 """
 
 from __future__ import annotations

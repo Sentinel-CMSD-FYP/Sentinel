@@ -146,7 +146,7 @@ def vehicles(export_path: Path, images: Path, extra: Path | None = None,
     from ultralytics import SAM, YOLO
 
     cfg = yaml.safe_load((REPO / "ml" / "configs" / "infrastructure_yolo26.yaml").read_text())
-    model = YOLO(str(REPO / cfg["weights"]))
+    model = YOLO(str(REPO / cfg["base_weights"]))
     boxes = yaml.safe_load(extra.read_text(encoding="utf-8-sig")) if extra else {}
     sam = SAM(str(WEIGHTS)) if boxes else None
     # bicycle, car, motorcycle, bus, truck; seen from straight above COCO calls cars "cell phone"

@@ -1,5 +1,6 @@
 # DM-Count density model (Tier 1, Model A).
-# Released UCF-QNRF weights from the DM-Count repo; fine tuned weights replace them in step 9.
+# Fine tuned on DroneCrowd (step 9, finetune_e4, md5 725694ba...); copy of
+# runs/kaggle/dmcount_train/v7/run/best.pth. Zero shot QNRF: data/weights/dmcount/model_qnrf.pth.
 
-weights: data/weights/dmcount/model_qnrf.pth   # relative to the repo root
+weights: data/weights/dmcount/finetune_e4.pth  # relative to the repo root
 device: auto                                   # cuda if available, else cpu

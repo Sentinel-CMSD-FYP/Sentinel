@@ -45,7 +45,7 @@ def main() -> None:
     ap.add_argument("--data", type=Path, default=REPO / "data" / "infra_labels",
                     help="folder with images/, labels/")
     ap.add_argument("--split", type=Path, default=REPO / "data" / "manifests" / "infra_split.json")
-    ap.add_argument("--weights", type=Path, default=REPO / cfg["weights"], help="base model")
+    ap.add_argument("--weights", type=Path, default=REPO / cfg["base_weights"], help="base model")
     ap.add_argument("--epochs", type=int, default=150)
     ap.add_argument("--patience", type=int, default=50)
     ap.add_argument("--imgsz", type=int, default=1280)

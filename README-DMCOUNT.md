@@ -1,6 +1,6 @@
 # DMCount: crowd density model (Sentinel Tier 1, Model A)
 
-Branch `density-dmcount`. Owner: Ahmar. Status on 2026.10.19: set up, fine tuned on DroneCrowd, evaluated on the full test split, density decision made. Integration (output format, backend wrapper, FPS) is still to come.
+Branch `density-dmcount`. Owner: Ahmar. Status on 2026.10.19: set up, fine tuned on DroneCrowd, evaluated on the full test split, density decision made. Step 16 (2026.10.20) added the layer output wrapper; backend and FPS are still to come.
 
 ## 1. Summary
 
@@ -41,16 +41,16 @@ def zone_count(x0, y0, x1, y1):            # zone in input pixels
 ```
 
 * The output is a density map, not points: there are no per person positions or ids. Tracking and person points come from Model B.
-* The final JSON shape for the backend (per zone counts, grid size, density grid) is not agreed yet; it is CLAUDE.md step 16 with Ahmed / Mahid.
+* Backend output (step 16): `sentinel_ml.density.density_layer` turns frames into a `grid` layer `density` (people per 120 px zone, 9x16 by default, 1 Hz) as in Mahid's layer contract. Format, sample and API: `docs/layers_density_infrastructure.md`, sample `docs/samples/seq011/density.json`.
 
 ### Weights
 
 | weights | where | notes |
 |---|---|---|
-| fine tuned `finetune_e4` (use this) | local `runs/kaggle/dmcount_train/v7/run/best.pth` (86 MB, md5 725694bafc292950a0c62ac43d855d22); Kaggle private dataset `ahmar004/sentinel-dmcount-ckpt` (file `best.pth`) | plain state dict, loads with `strict=True` |
+| fine tuned `finetune_e4` (use this) | local `data/weights/dmcount/finetune_e4.pth` (config default) = `runs/kaggle/dmcount_train/v7/run/best.pth` (86 MB, md5 725694bafc292950a0c62ac43d855d22); Kaggle private dataset `ahmar004/sentinel-dmcount-ckpt` (file `best.pth`) | plain state dict, loads with `strict=True` |
 | released QNRF (zero shot baseline) | local `data/weights/dmcount/model_qnrf.pth`; GitHub raw `cvlab-stonybrook/DM-Count/raw/cc5f213.../pretrained_models/model_qnrf.pth` | start point of fine tuning |
 
-* `ml/configs/density_dmcount.yaml` still points `weights:` at the QNRF file. Pass the fine tuned path (`DMCountConfig(weights=...)` or `--weights`) until the config is switched in step 16.
+* `ml/configs/density_dmcount.yaml` points `weights:` at `data/weights/dmcount/finetune_e4.pth` (local copy of `best.pth`, same md5) since step 16. Pass `--weights data/weights/dmcount/model_qnrf.pth` for the zero shot model.
 * Weights are gitignored (`*.pth`). Teammates get them from the Kaggle dataset (ask Ahmar for access) or from Ahmar directly.
 
 ### Speed (measured so far)
@@ -162,7 +162,7 @@ Local setup: `python -m venv .venv`, then `pip install -e "ml[dev,eval]" kaggle`
 
 ## 9. Open items for integration and Tier 2
 
-* Step 16: agree the density output JSON with the team (zone size, per zone counts, whether to send the grid), switch the config default to the fine tuned weights, wrap DMCount behind one function (frames in, agreed format out). Zones are dense when > 200 people per the decision; per zone thresholds still need to be set.
+* Step 16 done (2026.10.20): grid layer wrapper, config switched to `finetune_e4`. Still open: Mahid / Ahmed to confirm the format in `docs/layers_density_infrastructure.md`; per zone dense thresholds (the > 200 rule is per frame) are a Tier 2 risk choice.
 * Step 19: FPS on Kaggle at full res vs fp16 vs lower resolution, and 3 to 4 concurrent streams with memory.
 * Tier 2 gaps: scale augmentation or multi scale training for low altitude views (clips 17/18), low light augmentation or data for night, LR decay or a larger/averaged val (noisy val curve), own drone footage at 40 to 80 m for visual checks.
 * Deferred: DOT density head as an alternative to benchmark against DMCount.

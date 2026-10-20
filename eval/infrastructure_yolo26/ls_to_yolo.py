@@ -67,26 +67,35 @@ def convert(tasks: list[dict], classes: list[str]) -> dict[str, list[str]]:
     return out
 
 
-def draw_overlays(labels_dir: Path, images_dir: Path, out: Path, classes: list[str]) -> None:
-    """Draw the YOLO label files back onto their images, to check the export by eye."""
+def draw_labels(img, lines: list[str], classes: list[str]):
+    """Return ``img`` (BGR) with the YOLO seg label ``lines`` drawn as filled polygons."""
     import cv2
     import numpy as np
 
     colours = [(83, 200, 0), (0, 171, 255), (255, 98, 41), (0, 0, 213)]  # BGR, as in the LS config
+    img = img.copy()
+    h, w = img.shape[:2]
+    fill = img.copy()
+    for line in lines:
+        cid, *xy = line.split()
+        pts = (np.array(xy, np.float32).reshape(-1, 2) * (w, h)).round().astype(np.int32)
+        colour = colours[int(cid) % len(colours)]
+        cv2.fillPoly(fill, [pts], colour)
+        cv2.polylines(img, [pts], True, colour, 2, cv2.LINE_AA)
+        cv2.putText(img, classes[int(cid)], tuple(int(v) for v in pts[0]),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, colour, 2, cv2.LINE_AA)
+    return cv2.addWeighted(fill, 0.35, img, 0.65, 0)
+
+
+def draw_overlays(labels_dir: Path, images_dir: Path, out: Path, classes: list[str]) -> None:
+    """Draw the YOLO label files back onto their images, to check the export by eye."""
+    import cv2
+
     out.mkdir(parents=True, exist_ok=True)
     for txt in sorted(labels_dir.glob("*.txt")):
         img = cv2.imread(str(images_dir / f"{txt.stem}.jpg"))
-        h, w = img.shape[:2]
-        fill = img.copy()
-        for line in txt.read_text().splitlines():
-            cid, *xy = line.split()
-            pts = (np.array(xy, np.float32).reshape(-1, 2) * (w, h)).round().astype(np.int32)
-            colour = colours[int(cid) % len(colours)]
-            cv2.fillPoly(fill, [pts], colour)
-            cv2.polylines(img, [pts], True, colour, 2, cv2.LINE_AA)
-            cv2.putText(img, classes[int(cid)], tuple(int(v) for v in pts[0]),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, colour, 2, cv2.LINE_AA)
-        cv2.imwrite(str(out / f"{txt.stem}.jpg"), cv2.addWeighted(fill, 0.35, img, 0.65, 0))
+        cv2.imwrite(str(out / f"{txt.stem}.jpg"),
+                    draw_labels(img, txt.read_text().splitlines(), classes))
     print(f"overlays -> {out}")
 
 

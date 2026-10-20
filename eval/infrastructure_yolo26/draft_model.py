@@ -95,7 +95,7 @@ def main() -> None:
                                             "unlabelled images)")
     ap.add_argument("--data", type=Path, default=LABEL_DIR, help="folder with images/, labels/")
     ap.add_argument("--out", type=Path, help="train: run folder")
-    ap.add_argument("--weights", type=Path, default=REPO / cfg["weights"],
+    ap.add_argument("--weights", type=Path, default=REPO / cfg["base_weights"],
                     help="train: base model")
     ap.add_argument("--name", help="predict: drafts file name, e.g. batch2")
     ap.add_argument("--epochs", type=int, default=60)

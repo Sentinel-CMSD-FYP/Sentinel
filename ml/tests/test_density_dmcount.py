@@ -49,5 +49,5 @@ def test_overlay_matches_frame(model):
 
 def test_config_from_yaml():
     cfg = DMCountConfig.from_yaml(CONFIG)
-    assert cfg.weights.endswith("model_qnrf.pth")
+    assert cfg.weights.endswith("finetune_e4.pth")
     assert cfg.device == "auto"
