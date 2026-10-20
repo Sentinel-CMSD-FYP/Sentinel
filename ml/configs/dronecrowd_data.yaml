@@ -4,7 +4,7 @@ train_dir: train_data-002/train_data   # holds images/ and ground_truth/ (offici
 test_dir: test_data-001/test_data      # holds images/ and ground_truth/ (official test clips)
 train_list: trainlist.txt
 test_list: testlist.txt
-n_val: 10                              # clips held out from official train, decision 0002
+n_val: 10                              # clips held out from official train, docs/project-log.md
 seed: 0                                # fixed seed for the val clip choice
 manifest: data/manifests/dronecrowd_split.json
 check_dir: data/outputs/b1_check

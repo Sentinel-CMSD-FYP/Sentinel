@@ -1,6 +1,6 @@
 """DroneCrowd data loader for Model B (and later E).
 
-Splits used by this project (decision 0002):
+Splits used by this project (docs/project-log.md):
   * ``test``  = the official test clips (30). Used only for final numbers.
   * ``val``   = ``n_val`` clips held out from the official train clips, chosen with a
                 fixed seed and frozen in a manifest. The dataset's own ``val_data``
@@ -93,7 +93,7 @@ def build_manifest(official_train: list[int], official_test: list[int], n_val: i
     return {
         "dataset": "DroneCrowd",
         "note": "val is held out from the official train clips; the official val_data "
-                "folder is a copy of test frames and is not used (decision 0002)",
+                "folder is a copy of test frames and is not used (docs/project-log.md)",
         "seed": seed,
         "n_val": n_val,
         "train": sorted(set(official_train) - set(val)),
@@ -206,6 +206,21 @@ def dataset_from_config(cfg: dict, split: str, **kwargs) -> DroneCrowdDataset:
     manifest = json.loads(Path(cfg["manifest"]).read_text())
     return DroneCrowdDataset(Path(cfg["root"]), manifest, split, cfg["train_dir"],
                              cfg["test_dir"], **kwargs)
+
+
+def clip_gt_frames(cfg: dict, split: str, clip: int,
+                   frame_ids: list[int]) -> dict[int, tuple[np.ndarray, np.ndarray]]:
+    """GT of one clip as ``{frame_id: (points (N, 2) x, y px, person_ids (N,))}``.
+
+    Reads only the ``.mat`` files, never the images, so it works when the train images are
+    on a drive that is not plugged in. ``frame_ids`` are 0-based (file number minus 1).
+    """
+    folder = Path(cfg["root"]) / (cfg["test_dir"] if split == "test" else cfg["train_dir"])
+    out = {}
+    for fid in frame_ids:
+        path = folder / "ground_truth" / f"GT_img{clip:03d}{fid + 1:03d}.mat"
+        out[int(fid)] = load_gt(path)
+    return out
 
 
 def draw_check(cfg: dict, splits: tuple[str, ...] = SPLITS, per_split: int = 2) -> list[Path]:

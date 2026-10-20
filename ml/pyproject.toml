@@ -16,7 +16,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
-eval = []  # kept so "ml[dev,eval]" installs still work
+eval = ["matplotlib>=3.8", "scipy>=1.11"]  # eval/ scripts: threshold-sweep plot (matplotlib), DroneCrowd .mat annotations (scipy)
+export = ["imageio-ffmpeg>=0.5"]  # H.264 video for the viewer; without it the video won't play
 # Locally install the CPU wheel first: pip install torch --index-url https://download.pytorch.org/whl/cpu
 density = ["torch>=2.2"]
 # YOLO26 (Model C); pulls torchvision, matplotlib, polars

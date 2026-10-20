@@ -24,6 +24,7 @@ import numpy as np
 from dronecrowd_density import load_heads
 from scipy.spatial import cKDTree
 
+from sentinel_ml.flow.camera import remove_camera_motion
 from sentinel_ml.flow.farneback import FarnebackConfig, FarnebackFlow, FlowField
 
 BG_MIN_DIST = 40  # px from any annotated head to count as background
@@ -47,7 +48,7 @@ def sample(flow: FlowField, pts: np.ndarray, scale: float, radius: float) -> np.
 
 def evaluate(
     root: Path, seq: str, cfg: FarnebackConfig, gap: int, starts: list[int], radius: float,
-    move_thresh: float, rng: np.random.Generator,
+    move_thresh: float, rng: np.random.Generator, stabilise: bool = False,
 ) -> dict[str, float]:
     model = FarnebackFlow(cfg)
 
@@ -62,6 +63,8 @@ def evaluate(
         t0 = time.perf_counter()
         flow = model.compute(a, b)
         ms.append((time.perf_counter() - t0) * 1000)
+        if stabilise:  # subtract the camera's own shift, zoom and rotation
+            flow, _ = remove_camera_motion(flow, (a.shape[1], a.shape[0]))
 
         h1, h2 = heads(t), heads(t + gap)
         pos2 = {int(i): (x, y) for x, y, i in h2}
@@ -117,6 +120,8 @@ def main() -> None:
     ap.add_argument("--radius", type=float, default=6.0, help="window radius in original px")
     ap.add_argument("--move-thresh", type=float, default=2.0,
                     help="true displacement (px over the gap) that counts as moving")
+    ap.add_argument("--stabilise", action="store_true",
+                    help="subtract the fitted camera motion before comparing (see flow/camera.py)")
     ap.add_argument("--csv", type=Path, default=None)
     args = ap.parse_args()
 
@@ -141,7 +146,7 @@ def main() -> None:
         for s, win in ((s, w) for s in args.downscale for w in wins):
             cfg = replace(base, downscale=s, params=replace(base.params, winsize=win))
             r = evaluate(args.root, args.seq, cfg, gap, starts, args.radius,
-                         args.move_thresh, np.random.default_rng(0))
+                         args.move_thresh, np.random.default_rng(0), args.stabilise)
             r = {"downscale": s, "winsize": win, "gap": gap, **r}
             rows.append(r)
             print(f"{s:>5g} {win:>3} {gap:>3} {r['n']:>6.0f} {r['n_mov']:>6.0f} "

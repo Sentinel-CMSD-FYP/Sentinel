@@ -168,3 +168,16 @@ REAL = Path(__file__).resolve().parents[2] / "data" / "dronecrowd"
 def test_real_clip_011_first_frame_has_211_points():
     pts, ids = D.load_gt(REAL / TEST_DIR / "ground_truth" / "GT_img011001.mat")
     assert pts.shape == (211, 2) and ids.shape == (211,)
+
+
+def test_clip_gt_frames_reads_mat_files_without_the_images(root):
+    cfg = {"root": str(root), "train_dir": TRAIN_DIR, "test_dir": TEST_DIR}
+    for p in (root / TRAIN_DIR / "images").glob("*.jpg"):
+        p.unlink()  # prove that no image is needed
+    gt = D.clip_gt_frames(cfg, "val", 1, [0, 2])
+    assert sorted(gt) == [0, 2]
+    pts, ids = gt[0]
+    np.testing.assert_allclose(pts, [[10.0, 5.0], [20.0, 30.0]])
+    assert ids.tolist() == [1, 2]
+    pts_t, _ = D.clip_gt_frames(cfg, "test", 11, [1])[1]
+    np.testing.assert_allclose(pts_t, [[7.0, 9.0]])

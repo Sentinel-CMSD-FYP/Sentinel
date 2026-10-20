@@ -1,0 +1,3 @@
+# Config for eval/point_metrics.py (B-2).
+radius_px: 10.0   # match radius in original-frame pixels (Phase 0 target: 10 px)
+score_thr: 0.0    # keep predictions with score >= this; tune on validation only

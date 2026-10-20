@@ -1,0 +1,8 @@
+# Config for eval/track_count_error.py (E-3). Paths are relative to the repo root.
+# Definition fixed before any tracking result was computed (docs/project-log.md, E-3 protocol).
+data_config: ml/configs/dronecrowd_data.yaml
+lighting_tags: data/manifests/lighting_tags.yaml
+tracks_dir: data/outputs/tracks          # <tracks_dir>/<split>/clip_XXX_tracks.json from run_tracker
+min_len_frames: 45                       # secondary view only: ids output in fewer frames are dropped
+provisional_target_pct: 25               # draft Phase 0 sheet, tracking count; reference only
+out_dir: data/outputs/track_count_error  # results go to <out_dir>/<split>/
