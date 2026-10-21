@@ -67,3 +67,25 @@ REST_FRAMEWORK = {
 # Where clips live: one folder per clip holding clip.json, video.mp4 and layers/*.json.
 # `python docs/layers/make_sample_clip.py data/samples/demo_fake` makes a fake one.
 CLIPS_ROOT = Path(os.environ.get("CLIPS_ROOT", REPO_ROOT / "data" / "samples"))
+
+# Uploads from the browser (POST /api/v1/clips) and the model runs they start (see
+# apps/pipeline/jobs.py). The kaggle runner sends each run to a Kaggle GPU kernel and needs the
+# kaggle CLI token plus KAGGLE_USERNAME; local runs the models on this machine.
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "1024"))
+PIPELINE_RUNNER = os.environ.get("PIPELINE_RUNNER", "kaggle")
+PIPELINE_DEVICE = os.environ.get("PIPELINE_DEVICE") or None  # local runner; None = each config
+KAGGLE_USERNAME = os.environ.get("KAGGLE_USERNAME", "")
+KAGGLE_RUN_TIMEOUT_H = float(os.environ.get("KAGGLE_RUN_TIMEOUT_H", "8"))  # queue + run
+MAX_STREAMS = int(os.environ.get("MAX_STREAMS", "4"))  # live streams at once, one process each
+
+# Our own log lines (run_models progress, failing modules) on the console; Django's stay as is.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "loggers": {
+        "apps": {"handlers": ["console"], "level": "INFO"},
+        "sentinel_ml": {"handlers": ["console"], "level": "INFO"},
+    },
+}

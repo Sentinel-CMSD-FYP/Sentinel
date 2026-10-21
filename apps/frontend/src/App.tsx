@@ -1,43 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getClip, listClips, videoSrc } from './api'
 import { LayerPanel } from './components/LayerPanel'
+import { LiveView } from './components/LiveView'
+import { ModeSwitch } from './components/ModeSwitch'
 import { Stage, type StageStatus } from './components/Stage'
+import { UploadPanel } from './components/UploadPanel'
+import { cameraLabel } from './lib/camera'
 import type { ViewMode } from './lib/panels'
 import type { Clip, ClipSummary } from './types'
 import { useClipLayers } from './useClipLayers'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
-
-function ModeSwitch({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
-  const options: [ViewMode, string][] = [
-    ['single', 'Single'],
-    ['split', 'Split by model'],
-  ]
-  return (
-    <div className="mb-3 flex flex-wrap items-center gap-3">
-      <div role="group" aria-label="View" className="inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-1">
-        {options.map(([m, label]) => (
-          <button
-            key={m}
-            type="button"
-            aria-pressed={mode === m}
-            onClick={() => onChange(m)}
-            className={`rounded-lg px-3 py-1.5 text-sm transition ${
-              mode === m ? 'bg-sky-500 font-medium text-slate-950' : 'text-slate-300 hover:bg-white/10'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {mode === 'split' && (
-        <span className="text-xs text-slate-500">
-          One panel per model, all on the same clock. The boxes on the right control the combined panel only.
-        </span>
-      )}
-    </div>
-  )
-}
 
 export default function App() {
   const [clips, setClips] = useState<ClipSummary[] | null>(null)
@@ -47,6 +20,9 @@ export default function App() {
   const [status, setStatus] = useState<StageStatus>({ frame: 0, live: {} })
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<ViewMode>('single')
+  const [page, setPage] = useState<'clips' | 'live'>('clips')
+  // Bumped after an upload or a finished run, so the clip list and the open clip are read again.
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     const ctl = new AbortController()
@@ -57,7 +33,7 @@ export default function App() {
       })
       .catch((e) => !ctl.signal.aborted && setError(message(e)))
     return () => ctl.abort()
-  }, [])
+  }, [reload])
 
   useEffect(() => {
     if (!selectedId) return
@@ -71,10 +47,15 @@ export default function App() {
       })
       .catch((e) => !ctl.signal.aborted && setError(message(e)))
     return () => ctl.abort()
-  }, [selectedId])
+  }, [selectedId, reload])
 
   const layerState = useClipLayers(clip)
   const toggle = useCallback((layer: string) => setVisible((v) => ({ ...v, [layer]: !v[layer] })), [])
+  const showUploaded = useCallback((clipId: string) => {
+    setSelectedId(clipId)
+    setReload((n) => n + 1)
+  }, [])
+  const refresh = useCallback(() => setReload((n) => n + 1), [])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -89,8 +70,23 @@ export default function App() {
           <h1 className="text-lg font-semibold tracking-tight text-slate-50">Sentinel</h1>
           <span className="text-xs text-slate-400">Crowd early-warning · Tier 1 viewer</span>
         </div>
+        <div role="group" aria-label="Page" className="ml-auto inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-1">
+          {(['clips', 'live'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={page === p}
+              onClick={() => setPage(p)}
+              className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                page === p ? 'bg-sky-500 font-medium text-slate-950' : 'text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              {p === 'clips' ? 'Clips' : 'Live'}
+            </button>
+          ))}
+        </div>
         {clips && clips.length > 0 && (
-          <label className="ml-auto flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-slate-300">
             Clip
             <select
               className="rounded-lg border border-white/10 bg-slate-950/70 px-3 py-1.5 text-slate-100 outline-none focus:border-sky-400"
@@ -107,6 +103,8 @@ export default function App() {
         )}
       </header>
 
+      {page === 'clips' && <UploadPanel onUploaded={showUploaded} onRunDone={refresh} />}
+
       {error && (
         <p role="alert" className="mb-4 rounded-lg border border-rose-800 bg-rose-950/50 p-3 text-rose-200">
           {error}
@@ -120,7 +118,9 @@ export default function App() {
         </p>
       )}
 
-      {clip && (
+      {page === 'live' && <LiveView clipId={selectedId} clipName={clip?.name ?? selectedId} onStreamEnded={refresh} />}
+
+      {page === 'clips' && clip && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div>
             <ModeSwitch mode={mode} onChange={setMode} />
@@ -139,6 +139,7 @@ export default function App() {
                 `${clip.fps} fps`,
                 `frame ${status.frame} / ${clip.n_frames}`,
                 `${(status.frame / clip.fps).toFixed(2)} s`,
+                ...(clip.camera ? [cameraLabel(clip.camera)] : []),
               ].map((t) => (
                 <span key={t} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 tabular-nums text-slate-300">
                   {t}

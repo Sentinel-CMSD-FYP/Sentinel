@@ -20,6 +20,9 @@ FYP, FAST-NUCES Islamabad.
 
 ## Quick start
 
+To run the Tier 1 perception pipeline (all models, backend, dashboard) on a GPU machine, follow
+`docs/run_tier1.md`. The commands below only start the bare services.
+
 ```bash
 docker compose -f infra/docker-compose.yml up -d   # postgres + redis
 

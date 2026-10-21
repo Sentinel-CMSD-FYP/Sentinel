@@ -51,6 +51,32 @@ def draw_frame(image_bgr: np.ndarray, rows: list[list[float]],
     return out
 
 
+def render_video(doc: dict, refs: dict, start: int, seconds: float, trail: int, width: int,
+                 out_path: Path) -> int:
+    """Write the trail video of one tracks document; returns the number of frames written.
+
+    ``refs`` maps frame_id to a FrameRef of the clip. Frames start at ``start`` (frame_id) and
+    last ``seconds`` of footage; the video is ``width`` pixels wide (aspect ratio kept).
+    """
+    stride = int(doc.get("frame_stride", 1))
+    fps = float(doc["fps"] or 25)
+    n_frames = round(seconds * fps / stride)
+    ids = [i for i in range(start, start + n_frames * stride, stride) if i in refs]
+    size = (width, round(width * doc["frame_size"][1] / doc["frame_size"][0]))
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps / stride, size)
+    history: dict[int, deque] = defaultdict(lambda: deque(maxlen=trail))
+    for fid in ids:
+        img = cv2.imread(str(refs[fid].image_path))
+        rows = doc["frames"].get(str(fid), [])
+        frame = draw_frame(img, rows, history)
+        cv2.putText(frame, f"{doc['clip_id']} frame {fid}  tracks {len(rows)}", (20, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 255), 3)
+        writer.write(cv2.resize(frame, size, interpolation=cv2.INTER_AREA))
+    writer.release()
+    return len(ids)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--config", type=Path, required=True, help="the dronecrowd_data.yaml")
@@ -65,27 +91,12 @@ def main() -> None:
 
     doc = json.loads(args.tracks.read_text())
     clip = int(doc["clip_id"].split("_")[1])
-    fps = float(doc["fps"] or 25)
-    n_frames = round(args.seconds * fps / int(doc.get("frame_stride", 1)))
     ds = D.dataset_from_config(D.load_config(args.config), args.split)
     refs = {r.frame_id: r for r in ds.refs if r.clip == clip}
-    ids = [i for i in range(args.start, args.start + n_frames * int(doc["frame_stride"]),
-                            int(doc["frame_stride"])) if i in refs]
-    size = (args.width, round(args.width * doc["frame_size"][1] / doc["frame_size"][0]))
     out_path = args.out or Path("data/outputs/trails") / f"{doc['clip_id']}_f{args.start}.mp4"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"),
-                             fps / int(doc["frame_stride"]), size)
-    history: dict[int, deque] = defaultdict(lambda: deque(maxlen=args.trail))
-    for fid in ids:
-        img = cv2.imread(str(refs[fid].image_path))
-        rows = doc["frames"].get(str(fid), [])
-        frame = draw_frame(img, rows, history)
-        cv2.putText(frame, f"{doc['clip_id']} frame {fid}  tracks {len(rows)}", (20, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 255), 3)
-        writer.write(cv2.resize(frame, size, interpolation=cv2.INTER_AREA))
-    writer.release()
-    print(f"wrote {out_path}: {len(ids)} frames at {fps / int(doc['frame_stride']):g} fps")
+    n = render_video(doc, refs, args.start, args.seconds, args.trail, args.width, out_path)
+    fps = float(doc["fps"] or 25) / int(doc.get("frame_stride", 1))
+    print(f"wrote {out_path}: {n} frames at {fps:g} fps")
 
 
 if __name__ == "__main__":

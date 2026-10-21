@@ -124,7 +124,9 @@ def test_markdown_table_shows_bins_and_provisional_targets():
     res = ce.full_report([row(1, 50, 40), row(1, 250, 250)], CUT, 10, {1: "day"})
     md = ce.markdown(res, CUT, {"sparse": 15, "dense": 25})
     assert "**all clips**" in md and "**day only**" in md
-    assert "| sparse (GT < 100) | 1 | 1 | 50.0 | 10.00 | 10.00 | 20.0% | 20.0% | -20.0% | <= 15% |" in md
+    sparse = ("| sparse (GT < 100) | 1 | 1 | 50.0 | 10.00 | 10.00 | 20.0% | 20.0% | -20.0% "
+              "| <= 15% |")
+    assert sparse in md
     assert "moderate" not in md                          # empty bins are left out
 
 

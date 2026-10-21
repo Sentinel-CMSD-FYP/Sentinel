@@ -9,6 +9,7 @@ Dataset ``<user>/sentinel-ml-src``, which kernels attach as an input.
     python eval/density_dmcount/kaggle/push.py kernel eval/infrastructure_yolo26/kaggle/yolo26_smoke
     python eval/density_dmcount/kaggle/push.py ckpt runs/kaggle/dmcount_train/v4 -m "epoch 2"
     python eval/density_dmcount/kaggle/push.py labels -m "batch 1 labels + batch 2 images"
+    python eval/density_dmcount/kaggle/push.py uavdot -m "a6d3664 + dot_pd_dronecrowd_51.00"
     kaggle kernels status <user>/sentinel-dmcount-smoke
     kaggle kernels output <user>/sentinel-dmcount-smoke -p runs/kaggle/dmcount_smoke
 
@@ -37,10 +38,17 @@ SRC_SLUG = "sentinel-ml-src"
 CKPT_SLUG = "sentinel-dmcount-ckpt"
 LABELS_SLUG = "sentinel-infra-labels"
 LABELS_DIR = REPO / "data" / "infra_labels"
-# Copied into the dataset, relative to the repo root.
+UAVDOT_SLUG = "sentinel-b-ckpt"
+UAVDOT_DIR = REPO / "ml" / "third_party" / "uav-dot"
+# Copied into the dataset, relative to the repo root. The two sample images, not the clip
+# folders under data/samples (videos and layers, tens of MB each). The backend and the layer
+# tools let kernels run the real ingest_clip and run_models commands.
 SRC_PATHS = ["ml/pyproject.toml", "ml/src", "ml/configs", "eval/density_dmcount", "eval/pipeline",
-             "eval/infrastructure_yolo26", "data/samples", "data/manifests"]
-SKIP = shutil.ignore_patterns("__pycache__", "*.egg-info", "*.pyc", ".pytest_cache", "kaggle")
+             "eval/infrastructure_yolo26", "data/samples/dmcount_example_1.png",
+             "data/samples/dronecrowd_img100001.jpg", "data/manifests", "apps/backend",
+             "docs/layers"]
+SKIP = shutil.ignore_patterns("__pycache__", "*.egg-info", "*.pyc", ".pytest_cache", "kaggle",
+                              "node_modules", "db.sqlite3", ".git")
 
 
 def kaggle_user() -> str:
@@ -113,6 +121,16 @@ def push_labels(message: str) -> None:
         upload_dataset(stage, LABELS_SLUG, message)
 
 
+def push_uavdot(message: str) -> None:
+    """Upload Model B's code and checkpoint (``ml/third_party/uav-dot``, no .git) as a dataset."""
+    if not (UAVDOT_DIR / "checkpoints").is_dir():
+        raise SystemExit(f"no checkpoints/ in {UAVDOT_DIR}; see docs/pipeline_models.md (B)")
+    with tempfile.TemporaryDirectory() as tmp:
+        stage = Path(tmp) / "uavdot"
+        shutil.copytree(UAVDOT_DIR, stage / "uav-dot", ignore=SKIP)
+        upload_dataset(stage, UAVDOT_SLUG, message)
+
+
 def push_kernel(name: str) -> None:
     """Push a kernel folder: a name next to this script, or a path to a folder."""
     user = kaggle_user()
@@ -147,11 +165,15 @@ def main() -> None:
     c.add_argument("-m", "--message", default="update")
     lb = sub.add_parser("labels", help="upload Model C images + YOLO labels as a dataset")
     lb.add_argument("-m", "--message", default="update")
+    u = sub.add_parser("uavdot", help="upload Model B's uav-dot code + checkpoint as a dataset")
+    u.add_argument("-m", "--message", default="update")
     args = ap.parse_args()
     if args.cmd == "src":
         push_src(args.message)
     elif args.cmd == "labels":
         push_labels(args.message)
+    elif args.cmd == "uavdot":
+        push_uavdot(args.message)
     elif args.cmd == "ckpt":
         push_ckpt(args.output_dir, args.message)
     else:

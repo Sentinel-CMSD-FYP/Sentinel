@@ -5,10 +5,10 @@ Needs ``sentinel_ml`` and OpenCV (the repo .venv); skipped where only the API is
 
 import json
 
-import numpy as np
 import pytest
 from django.core.management import CommandError, call_command
 
+np = pytest.importorskip("numpy")
 cv2 = pytest.importorskip("cv2")
 pytest.importorskip("sentinel_ml.pipeline")
 
@@ -98,8 +98,71 @@ def test_an_existing_layer_needs_replace(clip, fake):
 
 
 def test_unknown_module_lists_the_available_ones(clip):
-    with pytest.raises(CommandError, match="unknown modules \\['flow'\\]; available: density"):
-        call_command("run_models", "demo", "--modules", "flow")
+    with pytest.raises(CommandError, match="unknown modules \\['nope'\\]; available: density"):
+        call_command("run_models", "demo", "--modules", "nope")
+
+
+def test_the_real_flow_module_adds_an_arrows_layer(clip):
+    """Flow needs no weights, so the registered module runs here as it does on a real clip."""
+    call_command("run_models", "demo", "--modules", "flow")
+    doc = json.loads((clip / "layers" / "flow.json").read_text())
+    assert doc["type"] == "grid" and doc["fields"] == ["u", "v", "speed"]
+    assert list(doc["frames"]) == ["0"]  # every 25 frames, the pair needs frame 5 (10 frames)
+    entry = manifest(clip)[0]
+    assert entry["layer"] == "flow" and entry["style"]["render"] == "arrows"
+    assert entry["default_visible"] is False  # registry.SHOWN, not add_layer's grid default
+    made = json.loads((clip / "clip.json").read_text())["produced_by"]["flow"]
+    assert made["model"] == "farneback" and made["every"] == 25 and made["frames"] == N_FRAMES
+
+
+def test_a_clip_camera_makes_flow_metres_per_second(clip):
+    doc = json.loads((clip / "clip.json").read_text())
+    doc["camera"] = {"altitude_m": 60.0, "hfov_deg": 71.53, "altitude_source": "assumed"}
+    (clip / "clip.json").write_text(json.dumps(doc))
+    call_command("run_models", "demo", "--modules", "flow")
+    assert json.loads((clip / "layers" / "flow.json").read_text())["units"] == "m_per_s"
+    assert manifest(clip)[0]["units"] == "m_per_s"
+    made = json.loads((clip / "clip.json").read_text())["produced_by"]["flow"]
+    assert made["units"] == "m_per_s"
+
+
+def test_produced_by_keeps_other_layers_and_a_flat_export_entry(clip, monkeypatch):
+    doc = json.loads((clip / "clip.json").read_text())
+    doc["produced_by"] = {"model": "farneback", "gap_frames": 5}  # as flow/export.py writes it
+    (clip / "clip.json").write_text(json.dumps(doc))
+    fake_module = FakeDensity()
+    fake_module.produced_by = {"model": "fake", "weights": "w.pth"}
+    monkeypatch.setitem(registry.BUILDERS, "fake_density", lambda device: fake_module)
+    call_command("run_models", "demo", "--modules", "fake_density")
+    made = json.loads((clip / "clip.json").read_text())["produced_by"]
+    assert made["flow"] == {"model": "farneback", "gap_frames": 5}
+    entry = made["density"]  # keyed by layer name
+    assert entry["model"] == "fake" and entry["weights"] == "w.pth"
+    assert entry["frames"] == N_FRAMES and entry["seconds"] >= 0 and len(entry["date"]) == 10
+
+
+def test_all_runs_every_registered_module(clip, fake, monkeypatch):
+    monkeypatch.setattr(registry, "BUILDERS", {"fake_density": registry.BUILDERS["fake_density"]})
+    call_command("run_models", "demo", "--modules", "all")
+    assert [e["layer"] for e in manifest(clip)] == ["density"] and fake[0].seen
+
+
+def test_tracks_brings_its_points_module_and_the_clip_fps(clip, monkeypatch):
+    """Asking for tracks runs one points module first; the real tracker links its rows."""
+    from sentinel_ml.localization.layer import PointsModule
+
+    def fake_points(device):
+        return PointsModule(lambda rgb: np.array([[20.0, 20.0, 0.9], [40.0, 30.0, 0.8]]))
+
+    monkeypatch.setitem(registry.BUILDERS, "points", fake_points)
+    call_command("run_models", "demo", "--modules", "tracks")
+    assert [e["layer"] for e in manifest(clip)] == ["points", "tracks"]
+    doc = json.loads((clip / "layers" / "tracks.json").read_text())
+    assert doc["type"] == "tracks" and doc["camera_motion_compensated"] is False
+    assert len(doc["frames"]) == N_FRAMES
+    assert all([r[0] for r in rows] == [1, 2] for rows in doc["frames"].values())
+    with pytest.raises(CommandError, match="already has layers \\['points', 'tracks'\\]"):
+        call_command("run_models", "demo", "--modules", "tracks")
 
 
 def test_unknown_clip_or_missing_video(clip, fake):
@@ -122,6 +185,41 @@ def test_an_invalid_layer_is_refused_and_nothing_is_written(clip, monkeypatch):
     bad.layer = lambda clip_id: {"type": "grid", "layer": "density", "clip_id": clip_id,
                                  "frame_size": list(SIZE)}
     monkeypatch.setitem(registry.BUILDERS, "bad", lambda device: bad)
-    with pytest.raises(CommandError, match="layer 'density' was refused"):
+    with pytest.raises(CommandError, match="modules failed .*density: layer refused"):
         call_command("run_models", "demo", "--modules", "bad")
     assert manifest(clip) == [] and not (clip / "layers" / "density.json").exists()
+    assert "produced_by" not in json.loads((clip / "clip.json").read_text())
+
+
+def test_a_failing_module_keeps_the_other_layers(clip, fake, monkeypatch):
+    """One module raises mid clip, another cannot be built: the good layer is still added."""
+    broken = FakeDensity("broken")
+
+    def explode(frame_id, frame):
+        if frame_id == 4:
+            raise RuntimeError("out of memory")
+
+    broken.process = explode
+
+    def no_weights(device):
+        raise FileNotFoundError("weights missing")
+
+    monkeypatch.setitem(registry.BUILDERS, "broken", lambda device: broken)
+    monkeypatch.setitem(registry.BUILDERS, "unbuilt", no_weights)
+    with pytest.raises(CommandError) as e:
+        call_command("run_models", "demo", "--modules", "broken,unbuilt,fake_density")
+    assert "unbuilt: build failed: FileNotFoundError: weights missing" in str(e.value)
+    assert "broken: process (frame 4) failed: RuntimeError: out of memory" in str(e.value)
+    assert [x["layer"] for x in manifest(clip)] == ["density"]
+    assert sorted(json.loads((clip / "clip.json").read_text())["produced_by"]) == ["density"]
+    assert fake[0].seen == list(range(N_FRAMES))
+
+
+def test_progress_is_logged_while_frames_are_decoded(clip, fake, monkeypatch, caplog):
+    from apps.pipeline import runner
+
+    monkeypatch.setattr(runner, "PROGRESS_EVERY", 4)
+    with caplog.at_level("INFO", logger="apps.pipeline.runner"):
+        call_command("run_models", "demo", "--modules", "fake_density")
+    lines = [r.getMessage() for r in caplog.records if "frames/s" in r.getMessage()]
+    assert [line.split(",")[0] for line in lines] == ["demo: 4/10 frames", "demo: 8/10 frames"]

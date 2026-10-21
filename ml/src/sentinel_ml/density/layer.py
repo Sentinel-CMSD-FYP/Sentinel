@@ -67,9 +67,17 @@ class DensityModule:
         self._frame_size: list[int] | None = None
         self._frames: dict[str, dict] = {}
 
+    def wants(self, frame_id: int) -> bool:
+        return frame_id % self.cfg.every == 0
+
+    @property
+    def samples(self) -> dict:
+        """The samples so far, keyed by frame id in the order made (read by live mode)."""
+        return self._frames
+
     def process(self, frame_id: int, frame: np.ndarray) -> None:
         cfg = self.cfg
-        if frame_id % cfg.every:
+        if not self.wants(frame_id):
             return
         size = [frame.shape[1], frame.shape[0]]
         if self._frame_size is None:

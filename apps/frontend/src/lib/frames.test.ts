@@ -10,6 +10,10 @@ describe('frameForTime', () => {
   it('never goes negative', () => {
     expect(frameForTime(-0.2, 25)).toBe(0)
   })
+  it('stays on the last frame at the end of playback', () => {
+    expect(frameForTime(12, 25, 300)).toBe(299)
+    expect(frameForTime(11.96, 25, 300)).toBe(299)
+  })
 })
 
 describe('sortedKeys', () => {

@@ -1,0 +1,12 @@
+# Parked cars on DroneCrowd test clip 11, frame 150 (1920x1080), ends read by eye at 6x zoom
+# (bumper to bumper). Typical car or van length 4.5 m; real ones vary about 4.2 to 4.9 m.
+frame: 150
+known_m: 4.5
+segments:
+  - {label: van a1, p1: [200, 498], p2: [275, 498]}
+  - {label: sedan a2, p1: [301, 510], p2: [375, 510]}
+  - {label: van a3, p1: [394, 506], p2: [469, 506]}
+  - {label: van a4, p1: [547, 497], p2: [617, 497]}
+  - {label: van b1, p1: [165, 595], p2: [235, 595]}
+  - {label: suv b3, p1: [337, 595], p2: [407, 595]}
+  - {label: car b5, p1: [511, 595], p2: [580, 595]}

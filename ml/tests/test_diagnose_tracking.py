@@ -154,3 +154,21 @@ def test_camera_translation_of_a_still_camera_is_about_zero(tmp_path):
         cv2.imwrite(str(path), cv2.merge([base.astype(np.uint8)] * 3))
         paths.append(path)
     assert dg.camera_translation(paths)["max_px"] < 0.2
+
+
+def test_purity_is_one_for_clean_tracks_and_drops_when_a_track_jumps_to_another_person():
+    doc, gt = make_clip(30)
+    assert dg.analyse_clip(doc, gt, CFG, None)["identity"]["purity"] == 1.0
+    # person 1 (A) is seen in frames 0-9 only; person 2 (B) stands 15 px away (inside the 20 px
+    # gate) and is seen in frames 10-29 only, so the track that followed A is handed to B
+    frames, gt2 = {}, {}
+    for f in range(30):
+        if f < 10:
+            frames[str(f)] = [[200.0, 200.0, 0.9]]
+            gt2[f] = (np.array([[200.0, 200.0]]), np.array([1]))
+        else:
+            frames[str(f)] = [[215.0, 200.0, 0.9]]
+            gt2[f] = (np.array([[215.0, 200.0]]), np.array([2]))
+    r = dg.analyse_clip({"frame_size": list(SIZE), "frames": frames}, gt2, CFG, None)
+    assert r["output_ids"] == 1  # one id covers both people
+    assert abs(r["identity"]["purity"] - 20 / 30) < 1e-9  # 20 of its 30 rows are on person 2

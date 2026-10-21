@@ -51,7 +51,7 @@ export function Stage({ clip, src, layers, visible, mode, onStatus }: Props) {
 
     const draw = () => {
       const { clip, layers, panels, onStatus } = latest.current
-      const now = frameForTime(video.currentTime, clip.fps)
+      const now = frameForTime(video.currentTime, clip.fps, clip.n_frames)
       const dpr = window.devicePixelRatio || 1
       const lives: Record<string, Record<string, boolean>> = {}
       for (const panel of panels) {
@@ -66,7 +66,8 @@ export function Stage({ clip, src, layers, visible, mode, onStatus }: Props) {
         }
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         lives[panel.id] = paintPanel({
-          ctx, w, h, video, clip, metas: panel.metas, layers, frame: now, pointer: pointer.current,
+          ctx, w, h, image: video.readyState >= 2 ? video : null, clip, metas: panel.metas, layers, frame: now,
+          pointer: pointer.current,
         })
       }
 
@@ -217,7 +218,7 @@ export function Stage({ clip, src, layers, visible, mode, onStatus }: Props) {
   )
 }
 
-interface PanelProps {
+export interface PanelProps {
   spec: PanelSpec
   aspect: string
   live: Record<string, boolean> | undefined
@@ -228,7 +229,7 @@ interface PanelProps {
   children?: React.ReactNode
 }
 
-function Panel({ spec, aspect, live, register, onMove, onLeave, onClick, children }: PanelProps) {
+export function Panel({ spec, aspect, live, register, onMove, onLeave, onClick, children }: PanelProps) {
   const empty = spec.metas.length === 0
   const gap = !empty && live && spec.metas.every((m) => live[m.layer] === false)
   return (

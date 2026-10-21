@@ -32,7 +32,10 @@ can become ground cells with the same fields, without changing the format.
 - **Units are explicit.** Flow is `px_per_frame` in original-frame pixels until a ground conversion
   exists; then it becomes `m_per_s` and the `units` field says so. The flow exporter writes `m_per_s`
   when it is given `--altitude` and `--hfov` (a straight-down camera over flat ground is assumed;
-  see `docs/decisions/0006-geometry-ground-sampling.md`).
+  see `docs/decisions/0006-geometry-ground-sampling.md`). The pipeline's flow module writes `m_per_s`
+  when clip.json has a `camera` block (`altitude_m`, `hfov_deg`, `altitude_source` assumed, stated
+  or telemetry; optional `model`, `dfov_deg`, `sensor_aspect`), set by `ingest_clip --altitude` or
+  the upload form.
 - **Models may run slower than the video.** Flow and density at about 1 Hz are normal. Entries are
   sparse; they are not required for every frame.
 - **Dwell before risk.** A risk layer (later) must not emit a score for a cell until its history fills

@@ -1,6 +1,10 @@
-/** Video time to frame number, as the layer contract defines it: round(time * fps). */
-export function frameForTime(timeSeconds: number, fps: number): number {
-  return Math.max(0, Math.round(timeSeconds * fps))
+/**
+ * Video time to frame number, as the layer contract defines it: round(time * fps). With `nFrames`
+ * it stays on the last frame: at the end of playback the time is n_frames / fps, which would
+ * otherwise give frame n_frames, one past the clip, where no layer has data.
+ */
+export function frameForTime(timeSeconds: number, fps: number, nFrames = Infinity): number {
+  return Math.min(nFrames - 1, Math.max(0, Math.round(timeSeconds * fps)))
 }
 
 export function sortedKeys(frames: Record<string, unknown>): number[] {

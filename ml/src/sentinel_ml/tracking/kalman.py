@@ -45,6 +45,14 @@ class ConstantVelocityKF:
         self.P = self.F @ self.P @ self.F.T + self.Q
         return self.xy
 
+    def shift(self, dx: float, dy: float) -> None:
+        """Move the position estimate by (dx, dy) pixels, e.g. for a camera shift.
+
+        Only the position moves; the velocity and the covariance are left as they are.
+        """
+        self.x[0] += dx
+        self.x[1] += dy
+
     def update(self, xy: tuple[float, float]) -> None:
         """Correct the state with a measured (x, y)."""
         z = np.asarray(xy, dtype=float)

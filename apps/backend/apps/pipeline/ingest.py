@@ -31,8 +31,13 @@ CRF = 18
 
 
 def ingest_clip(root: Path, source: Path, clip_id: str, *, seq: str | None = None,
-                fps: float | None = None, name: str | None = None) -> dict:
-    """Write ``<root>/<clip_id>/{video.mp4, clip.json, layers/}`` and return the clip.json."""
+                fps: float | None = None, name: str | None = None,
+                camera: dict | None = None) -> dict:
+    """Write ``<root>/<clip_id>/{video.mp4, clip.json, layers/}`` and return the clip.json.
+
+    ``camera`` (from ``apps.pipeline.camera.camera_block``) is stored as clip.json ``camera``;
+    with it, flow reports metres per second.
+    """
     from sentinel_ml.flow.export import find_ffmpeg
     from sentinel_ml.flow.sources import open_frames
 
@@ -64,6 +69,8 @@ def ingest_clip(root: Path, source: Path, clip_id: str, *, seq: str | None = Non
 
         clip = {"schema_version": 1, "clip_id": clip_id, "name": name or clip_id,
                 "fps": float(src_fps), "frame_size": [w, h], "n_frames": n, "layers": []}
+        if camera:
+            clip["camera"] = camera
         (work / "clip.json").write_text(json.dumps(clip, indent=2), encoding="utf-8")
         work.rename(final)  # the temporary folder is gone now, so cleanup has nothing to do
     logger.info("ingested %s: %d frames at %g fps, %dx%d", clip_id, n, src_fps, w, h)
@@ -72,27 +79,50 @@ def ingest_clip(root: Path, source: Path, clip_id: str, *, seq: str | None = Non
 
 def encode(ffmpeg: str, frames, video: Path, fps: float, size: tuple[int, int]) -> int:
     """Pipe BGR frames into ffmpeg as H.264; returns the number of frames written."""
-    w, h = size
-    proc = subprocess.Popen(
-        [ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24",
-         "-s", f"{w}x{h}", "-r", f"{fps:g}", "-i", "-", "-c:v", "libx264", "-crf", str(CRF),
-         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(video)],
-        stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-    )
-    n = 0
+    rec = Recorder(ffmpeg, video, fps, size)
     try:
         for frame in frames:
-            if frame is None or frame.shape != (h, w, 3):
-                raise RunError(f"frame {n} is missing or not {w}x{h} colour")
-            proc.stdin.write(frame.tobytes())
-            n += 1
+            rec.write(frame)
     except (RunError, OSError):
-        proc.kill()
-        proc.wait()
+        rec.abort()
         raise
-    _, err = proc.communicate()
-    if proc.returncode != 0:
-        raise RunError(f"ffmpeg failed: {err.decode(errors='replace').strip()}")
-    if n == 0:
-        raise RunError("no frames read from the source")
-    return n
+    return rec.close()
+
+
+class Recorder:
+    """Frames pushed one at a time into ffmpeg as browser playable H.264 (``video.mp4``).
+
+    ``preset`` is ffmpeg's speed setting; a live stream uses a fast one, so recording keeps up
+    with the source next to the models.
+    """
+
+    def __init__(self, ffmpeg: str, video: Path, fps: float, size: tuple[int, int],
+                 preset: str = "medium") -> None:
+        w, h = self.size = size
+        self.n = 0
+        self.proc = subprocess.Popen(
+            [ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24",
+             "-s", f"{w}x{h}", "-r", f"{fps:g}", "-i", "-", "-c:v", "libx264", "-preset", preset,
+             "-crf", str(CRF), "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(video)],
+            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+
+    def write(self, frame) -> None:
+        w, h = self.size
+        if frame is None or frame.shape != (h, w, 3):
+            raise RunError(f"frame {self.n} is missing or not {w}x{h} colour")
+        self.proc.stdin.write(frame.tobytes())
+        self.n += 1
+
+    def abort(self) -> None:
+        self.proc.kill()
+        self.proc.wait()
+
+    def close(self) -> int:
+        """Finish the file; returns the number of frames written."""
+        _, err = self.proc.communicate()
+        if self.proc.returncode != 0:
+            raise RunError(f"ffmpeg failed: {err.decode(errors='replace').strip()}")
+        if self.n == 0:
+            raise RunError("no frames read from the source")
+        return self.n

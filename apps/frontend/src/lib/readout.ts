@@ -1,4 +1,4 @@
-import type { GridLayer } from '../types'
+import type { GridLayer, PolygonObject } from '../types'
 import type { GridRender } from './layers'
 
 type Entry = Record<string, number[][]>
@@ -26,6 +26,27 @@ export function cellAt(layer: GridLayer, x: number, y: number): { row: number; c
     row: Math.floor((y / h) * layer.grid.rows),
     col: Math.floor((x / w) * layer.grid.cols),
   }
+}
+
+/** Is (x, y) inside the polygon? Even odd rule, so it works for any simple outline. */
+export function insidePolygon(polygon: [number, number][], x: number, y: number): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i]
+    const [xj, yj] = polygon[j]
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+/** The object under (x, y) in original-frame pixels: the last drawn, so the one on top. */
+export function objectAt(objects: PolygonObject[], x: number, y: number): PolygonObject | null {
+  for (let i = objects.length - 1; i >= 0; i--) {
+    const o = objects[i]
+    const [x1, y1, x2, y2] = o.box
+    if (x >= x1 && x <= x2 && y >= y1 && y <= y2 && insidePolygon(o.polygon, x, y)) return o
+  }
+  return null
 }
 
 /** What one cell holds right now; null for a gap, because gaps stay gaps. */

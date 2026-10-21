@@ -77,6 +77,20 @@ function Classes({ meta, state, frame }: { meta: LayerMeta; state: LayerState; f
   )
 }
 
+/** How many points or tracks the current sample holds. */
+function Count({ meta, state, frame }: { meta: LayerMeta; state: LayerState; frame: number }) {
+  const indexed = state.layers[meta.layer]
+  if (!indexed || (indexed.layer.type !== 'points' && indexed.layer.type !== 'tracks')) return null
+  const key = pickSample(indexed.keys, frame, indexed.layer.max_age_frames)
+  if (key === null) return null
+  const n = indexed.layer.frames[String(key)].length
+  return (
+    <p className="mt-2 text-xs text-slate-400">
+      <span className="text-sm font-semibold tabular-nums text-slate-100">{n}</span> {meta.type} at this frame
+    </p>
+  )
+}
+
 function Legend({ meta, state }: { meta: LayerMeta; state: LayerState }) {
   const indexed = state.layers[meta.layer]
   if (!indexed || indexed.layer.type !== 'grid') return null
@@ -87,7 +101,7 @@ function Legend({ meta, state }: { meta: LayerMeta; state: LayerState }) {
   if (mode.kind === 'arrows') {
     return (
       <p className="mt-1 text-xs text-slate-400">
-        Arrow length is proportional to speed; the longest is {fmt(top)} {units}.
+        Arrow length is proportional to speed; a full length arrow is {fmt(top)} {units}.
       </p>
     )
   }
@@ -133,6 +147,7 @@ export function LayerPanel(p: Props) {
                   <Legend meta={meta} state={p.state} />
                   <Now meta={meta} state={p.state} frame={p.frame} />
                   <Classes meta={meta} state={p.state} frame={p.frame} />
+                  <Count meta={meta} state={p.state} frame={p.frame} />
                 </>
               )}
             </li>

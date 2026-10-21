@@ -13,6 +13,19 @@
     },
     "n_frames": {"type": "integer", "minimum": 1},
     "video_url": {"type": "string"},
+    "camera": {
+      "type": "object",
+      "description": "Straight down camera facts for metres and m/s (sentinel_ml.geometry). dfov_deg and sensor_aspect are kept when hfov_deg was converted from a diagonal FOV.",
+      "required": ["altitude_m", "hfov_deg", "altitude_source"],
+      "properties": {
+        "model": {"type": "string"},
+        "altitude_m": {"type": "number", "exclusiveMinimum": 0},
+        "hfov_deg": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180},
+        "dfov_deg": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180},
+        "sensor_aspect": {"type": "string"},
+        "altitude_source": {"enum": ["assumed", "stated", "telemetry"]}
+      }
+    },
     "layers": {
       "type": "array",
       "items": {

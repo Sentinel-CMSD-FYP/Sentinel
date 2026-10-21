@@ -6,10 +6,10 @@ the API is installed.
 
 import json
 
-import numpy as np
 import pytest
 from django.core.management import CommandError, call_command
 
+np = pytest.importorskip("numpy")
 cv2 = pytest.importorskip("cv2")
 pytest.importorskip("sentinel_ml.flow.export")
 from sentinel_ml.flow import export  # noqa: E402
@@ -67,6 +67,24 @@ def test_a_video_keeps_its_frame_rate(tmp_path, root):
     call_command("ingest_clip", str(tmp_path / "in.mp4"), "demo")
     clip = json.loads((root / "demo" / "clip.json").read_text())
     assert clip["fps"] == 25.0 and clip["n_frames"] == N_FRAMES and clip["name"] == "demo"
+
+
+def test_camera_flags_go_into_clip_json(tmp_path, root, capsys):
+    write_video(tmp_path / "in.mp4", N_FRAMES)
+    call_command("ingest_clip", str(tmp_path / "in.mp4"), "demo", "--altitude", "60",
+                 "--dfov", "82.1", "--camera-model", "DJI Mini 3", "--altitude-source", "stated")
+    clip = json.loads((root / "demo" / "clip.json").read_text())
+    assert clip["camera"] == {"altitude_m": 60.0, "altitude_source": "stated",
+                              "model": "DJI Mini 3", "hfov_deg": 69.73, "dfov_deg": 82.1,
+                              "sensor_aspect": "4:3"}
+    assert "camera: 60 m (stated), horizontal FOV 69.73 degrees" in capsys.readouterr().out
+
+
+def test_a_fov_without_altitude_is_refused_before_ingest(tmp_path, root):
+    write_video(tmp_path / "in.mp4", N_FRAMES)
+    with pytest.raises(CommandError, match="--altitude is needed"):
+        call_command("ingest_clip", str(tmp_path / "in.mp4"), "demo", "--hfov", "70")
+    assert not root.exists() or not any(root.iterdir())
 
 
 def test_ingest_then_run_models_then_the_api(tmp_path, root, client, monkeypatch):
