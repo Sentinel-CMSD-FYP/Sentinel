@@ -1,0 +1,7 @@
+# Model E tracks as a tracks layer (step 24): sentinel_ml.tracking.layer.
+# The tracker itself is set by tracker_e2_candidate.yaml (Tier 1, frozen for test run 2);
+# it runs on every frame the points module runs on, and max_age_s uses the clip's fps.
+
+max_age_frames: 1    # a sample stays on screen until the next frame (B runs every frame)
+xy_decimals: 1       # rounding in the JSON, as in run_tracker's tracks files
+score_decimals: 4

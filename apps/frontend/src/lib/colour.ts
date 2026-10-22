@@ -30,6 +30,15 @@ export const RAMP_GRADIENT = `linear-gradient(to right, ${STOPS.map(
   ([r, g, b]) => `rgb(${r}, ${g}, ${b})`,
 ).join(', ')})`
 
+const CLASS_COLOURS = ['#34d399', '#fb923c', '#38bdf8', '#f472b6', '#facc15', '#a78bfa']
+
+/** A fixed colour per class, by its place in the layer's class list; unknown classes are grey. */
+export function classColour(classes: string[], cls: string): string {
+  const i = classes.indexOf(cls)
+  if (i < 0) return '#94a3b8'
+  return CLASS_COLOURS[i] ?? `hsl(${(i * 47) % 360}, 85%, 60%)`
+}
+
 /** A stable colour per track id, spread around the hue wheel. */
 export function trackColour(id: number): string {
   return `hsl(${(id * 47) % 360}, 85%, 60%)`

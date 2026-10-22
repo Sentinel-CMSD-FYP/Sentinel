@@ -7,6 +7,11 @@ checks the layer against the clip first. Standard library only.
     python docs/layers/add_layer.py data/samples/market_demo density.json --label "Density"
     python docs/layers/add_layer.py data/samples/market_demo density.json --replace
     python docs/layers/add_layer.py data/samples/market_demo --remove density
+    python docs/layers/add_layer.py data/samples/dc_011 clip_011_points.json --fix-clip-id
+
+Files in the Models B and E format (``docs/contracts.md`` v1.0) are accepted as they are: the
+layer type comes from the file name (``*_points.json`` or ``*_tracks.json``, or ``--kind``), and
+``max_age_frames`` defaults to the file's ``frame_stride``. Their extra header fields are kept.
 
 The layer is refused, and nothing is written, if it is not valid under the layer contract, if it
 was made for a different video (different ``clip_id`` or ``frame_size``), if it uses frame numbers
@@ -51,6 +56,33 @@ def _write(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
+def from_contract(doc: dict, kind: str, max_age: int | None = None) -> dict:
+    """Turn a contracts v1.0 points or tracks file into a layer file; nothing in it is dropped.
+
+    v1.0 has no ``type``, ``layer`` or ``max_age_frames``. A sample should stay up until the next
+    one can arrive, so the default age is the file's ``frame_stride`` (1 if absent).
+    """
+    stride = doc.get("frame_stride", 1)
+    if max_age is None:
+        if not isinstance(stride, int) or isinstance(stride, bool) or stride < 1:
+            raise LayerError(f"frame_stride must be a whole number >= 1, got {stride!r}")
+        max_age = stride
+    return {**doc, "schema_version": 1, "type": kind, "layer": kind, "max_age_frames": max_age}
+
+
+def _contract_kind(layer_file: Path, kind: str | None) -> str:
+    if kind is None:
+        stem = Path(layer_file).stem
+        kind = next((k for k in ("points", "tracks") if stem.endswith("_" + k)), None)
+    if kind not in ("points", "tracks"):
+        raise LayerError(
+            "this file is in the contracts v1.0 format, which does not say whether it holds "
+            "points or tracks. Name it <clip>_points.json or <clip>_tracks.json, or add "
+            "--kind points / --kind tracks."
+        )
+    return kind
+
+
 def manifest_entry(doc: dict, label: str | None, visible: bool | None, field: str | None) -> dict:
     """The clip.json line that tells the viewer how to show this layer."""
     name = doc["layer"]
@@ -83,11 +115,19 @@ def add_layer(
     field: str | None = None,
     replace: bool = False,
     fix_clip_id: bool = False,
+    kind: str | None = None,
+    max_age: int | None = None,
     dry_run: bool = False,
 ) -> str:
     clip_dir = Path(clip_dir)
     clip = _load(clip_dir / "clip.json", "clip.json")
     doc = _load(Path(layer_file), "layer file")
+    if isinstance(doc.get("schema_version"), str) and "type" not in doc:
+        if doc["schema_version"] != "1.0":
+            raise LayerError(f"unknown contracts version {doc['schema_version']!r}; expected '1.0'")
+        doc = from_contract(doc, _contract_kind(Path(layer_file), kind), max_age)
+    elif max_age is not None:
+        doc["max_age_frames"] = max_age
 
     name = name or doc.get("layer")
     if not isinstance(name, str) or not NAME.match(name):
@@ -173,6 +213,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--replace", action="store_true", help="overwrite a layer that exists")
     ap.add_argument("--fix-clip-id", action="store_true",
                     help="rewrite the layer's clip_id to match this clip")
+    ap.add_argument("--kind", choices=["points", "tracks"],
+                    help="contracts v1.0 files: what the file holds (default: from its name)")
+    ap.add_argument("--max-age", type=int, metavar="FRAMES",
+                    help="how long a sample stays up (default: the file's own, or frame_stride)")
     ap.add_argument("--dry-run", action="store_true", help="check and report, write nothing")
     a = ap.parse_args(argv)
 
@@ -186,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
                 ap.error("give a layer file to add, or --remove NAME")
             print(add_layer(a.clip_dir, a.layer_file, name=a.name, label=a.label,
                             visible=a.visible, field=a.field, replace=a.replace,
-                            fix_clip_id=a.fix_clip_id, dry_run=a.dry_run))
+                            fix_clip_id=a.fix_clip_id, kind=a.kind, max_age=a.max_age,
+                            dry_run=a.dry_run))
     except LayerError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

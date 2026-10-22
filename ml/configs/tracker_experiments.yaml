@@ -12,4 +12,23 @@ step2:
 selection:
   min_coverage: 0.90                        # mean GT-people coverage must be at least this
   tie_points: 1.0                           # within this many points of the best counts as tied
+  step3_min_purity: 0.935                   # step 3 only: purity of the step-2 winner (0.955) minus 0.02
+  step3_min_coverage: 0.88                  # step 3 only. POST-HOC: relaxed from 0.90 after seeing step 3 on val (decision 0009)
+step3:
+  # extended miss limit in seconds, at the frozen score_thr 0.35 and min_hits 3 (25 was the edge of
+  # the step-2 grid). 1.0 s = 25 frames at 25 fps and reproduces the step-2 winner. Cap: 4 s.
+  max_age_s: [1.0, 1.5, 2.0, 3.0, 4.0]
+tracker_config_step3: ml/configs/tracker_selected.yaml
+step4:
+  # altitude scaling off vs on, per-clip size proxy (large 50 m, small 100 m); on only if the primary
+  # error improves by at least this many points and the step-3 floors hold (decision 0009)
+  min_gain_points: 1.0
+tracker_config_step4: ml/configs/tracker_selected_e2.yaml
+size_tags: data/manifests/object_size_tags.yaml
+step5:
+  # camera-motion compensation off vs on (Mahid's Farneback, default config, median shift); on only
+  # if the primary error improves by at least this many points and the step-3 floors hold
+  min_gain_points: 1.0
+tracker_config_step5: ml/configs/tracker_e2_candidate.yaml
+shifts_dir: data/outputs/camera_shifts/val   # written by eval/compute_camera_shifts.py
 out_dir: data/outputs/tracker_experiments

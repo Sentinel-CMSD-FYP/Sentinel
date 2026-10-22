@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rampColour, trackColour } from './colour'
+import { classColour, rampColour, trackColour } from './colour'
 
 describe('rampColour', () => {
   it('starts dark and ends bright', () => {
@@ -21,5 +21,17 @@ describe('trackColour', () => {
   it('is stable per id and differs between neighbouring ids', () => {
     expect(trackColour(3)).toBe(trackColour(3))
     expect(trackColour(3)).not.toBe(trackColour(4))
+  })
+})
+
+describe('classColour', () => {
+  const classes = ['gate_exit', 'barrier', 'wall', 'obstruction']
+  it('gives each class its own colour, fixed by class order', () => {
+    const colours = classes.map((c) => classColour(classes, c))
+    expect(new Set(colours).size).toBe(4)
+    expect(classColour(['wall'], 'wall')).toBe(colours[0])
+  })
+  it('greys out a class the layer does not list', () => {
+    expect(classColour(classes, 'tree')).toBe('#94a3b8')
   })
 })

@@ -11,13 +11,20 @@ dependencies = [
     "numpy>=1.26",
     "opencv-python-headless>=4.9",
     "pyyaml>=6.0",
-    "scipy>=1.11",
+    "scipy>=1.11",  # reads DroneCrowd .mat annotations (sentinel_ml.localization.data)
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
 eval = ["matplotlib>=3.8", "scipy>=1.11"]  # eval/ scripts: threshold-sweep plot (matplotlib), DroneCrowd .mat annotations (scipy)
 export = ["imageio-ffmpeg>=0.5"]  # H.264 video for the viewer; without it the video won't play
+# Locally install the CPU wheel first: pip install torch --index-url https://download.pytorch.org/whl/cpu
+density = ["torch>=2.2"]
+# YOLO26 (Model C); pulls torchvision, matplotlib, polars
+infra = ["ultralytics>=8.4"]
+# Model B (DOT + Pixel Distill, code in ml/third_party/uav-dot); smp 0.3.4 needs timm 0.9.7
+points = ["segmentation-models-pytorch==0.3.4", "timm==0.9.7", "pytorch-lightning>=2.1",
+          "hydra-core>=1.3", "gdown>=5"]  # gdown: eval/pipeline/fetch_weights.py
 
 [tool.setuptools.packages.find]
 where = ["src"]

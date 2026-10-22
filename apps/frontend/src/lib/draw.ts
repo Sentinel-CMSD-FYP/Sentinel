@@ -1,15 +1,17 @@
-import type { GridLayer, PointRow, TrackRow } from '../types'
-import { rampColour, rgba, trackColour } from './colour'
+import type { GridLayer, PolygonObject, PointRow, TrackRow } from '../types'
+import { classColour, rampColour, rgba, trackColour } from './colour'
 
 /** Canvas CSS pixels per original-frame pixel. */
 export interface Scale {
   sx: number
   sy: number
+  /** Dot radius in CSS pixels for points and tracks; smaller in small panels. Default 4. */
+  dot?: number
 }
 
 type Entry = Record<string, number[][]>
 
-/** Fill each valid cell with a colour for its value; zero stays transparent. */
+/** Fill each valid cell with a colour for its value; zero stays transparent. `faint` halves the opacity. */
 export function drawHeatmap(
   ctx: CanvasRenderingContext2D,
   layer: GridLayer,
@@ -17,6 +19,7 @@ export function drawHeatmap(
   field: string,
   top: number,
   k: Scale,
+  faint = false,
 ): void {
   if (top <= 0) return
   const cw = (layer.frame_size[0] / layer.grid.cols) * k.sx
@@ -26,13 +29,13 @@ export function drawHeatmap(
       if (entry.valid?.[r]?.[c] !== 1) continue // gaps stay gaps: draw nothing
       const t = (entry[field]?.[r]?.[c] ?? 0) / top
       if (t <= 0) continue
-      ctx.fillStyle = rgba(rampColour(t), 0.25 + 0.45 * Math.min(1, t))
+      ctx.fillStyle = rgba(rampColour(t), (0.25 + 0.45 * Math.min(1, t)) * (faint ? 0.5 : 1))
       ctx.fillRect(c * cw, r * ch, cw, ch)
     }
   }
 }
 
-/** One arrow per valid cell; its length is proportional to the vector, the longest filling ~45% of a cell. */
+/** One arrow per valid cell; its length is proportional to the vector, `top` filling ~45% of a cell. */
 export function drawArrows(
   ctx: CanvasRenderingContext2D,
   layer: GridLayer,
@@ -90,10 +93,35 @@ export function drawPoints(ctx: CanvasRenderingContext2D, rows: PointRow[], k: S
   for (const [x, y, score] of rows) {
     ctx.fillStyle = `rgba(251, 191, 36, ${0.45 + 0.55 * score})`
     ctx.beginPath()
-    ctx.arc(x * k.sx, y * k.sy, 4, 0, Math.PI * 2)
+    ctx.arc(x * k.sx, y * k.sy, k.dot ?? 4, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
   }
+}
+
+/** Each object as a lightly filled outline in its class colour. */
+export function drawPolygons(
+  ctx: CanvasRenderingContext2D,
+  classes: string[],
+  objects: PolygonObject[],
+  k: Scale,
+): void {
+  ctx.lineWidth = 2
+  ctx.lineJoin = 'round'
+  for (const obj of objects) {
+    if (obj.polygon.length < 3) continue
+    const colour = classColour(classes, obj.cls)
+    ctx.beginPath()
+    obj.polygon.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x * k.sx, y * k.sy) : ctx.lineTo(x * k.sx, y * k.sy)))
+    ctx.closePath()
+    ctx.globalAlpha = 0.22
+    ctx.fillStyle = colour
+    ctx.fill()
+    ctx.globalAlpha = 0.95
+    ctx.strokeStyle = colour
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
 }
 
 /** Faded trail per track id, then a dot at each track's latest position. */
@@ -122,23 +150,34 @@ export function drawTracks(
   for (const [id, x, y] of current) {
     ctx.fillStyle = trackColour(id)
     ctx.beginPath()
-    ctx.arc(x * k.sx, y * k.sy, 4.5, 0, Math.PI * 2)
+    ctx.arc(x * k.sx, y * k.sy, (k.dot ?? 4) + 0.5, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
   }
 }
 
-/** Outline the hovered cell and label it next to the pointer; `lines` are the readings to show. */
+/** White outline of the object under the pointer. */
+export function drawOutline(ctx: CanvasRenderingContext2D, polygon: [number, number][], k: Scale): void {
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)'
+  ctx.lineWidth = 2.5
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  polygon.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x * k.sx, y * k.sy) : ctx.lineTo(x * k.sx, y * k.sy)))
+  ctx.closePath()
+  ctx.stroke()
+}
+
+/** Outline the hovered cell (if any) and label it next to the pointer; `lines` are the readings to show. */
 export function drawHover(
   ctx: CanvasRenderingContext2D,
-  cell: { x: number; y: number; w: number; h: number },
+  cell: { x: number; y: number; w: number; h: number } | null,
   lines: string[],
   pointer: { x: number; y: number },
   bounds: { w: number; h: number },
 ): void {
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
   ctx.lineWidth = 1.5
-  ctx.strokeRect(cell.x + 0.75, cell.y + 0.75, cell.w - 1.5, cell.h - 1.5)
+  if (cell) ctx.strokeRect(cell.x + 0.75, cell.y + 0.75, cell.w - 1.5, cell.h - 1.5)
   if (lines.length === 0) return
   ctx.font = '600 13px system-ui, sans-serif'
   const pad = 8

@@ -1,6 +1,6 @@
-import { RAMP_GRADIENT } from '../lib/colour'
+import { classColour, RAMP_GRADIENT } from '../lib/colour'
 import { pickSample } from '../lib/frames'
-import { gridRender } from '../lib/layers'
+import { countByClass, gridRender } from '../lib/layers'
 import { gridTop } from '../lib/overlay'
 import { fmt, summarise, unitLabel } from '../lib/readout'
 import type { Clip, LayerMeta } from '../types'
@@ -17,7 +17,7 @@ interface Props {
   onToggle: (layer: string) => void
 }
 
-const TYPE_LABEL = { grid: 'grid', points: 'points', tracks: 'tracks' } as const
+const TYPE_LABEL = { grid: 'grid', points: 'points', tracks: 'tracks', polygons: 'polygons' } as const
 
 function status(meta: LayerMeta, p: Props): { text: string; tone: string; title?: string } {
   const failed = p.state.failed[meta.layer]
@@ -57,6 +57,40 @@ function Now({ meta, state, frame }: { meta: LayerMeta; state: LayerState; frame
   )
 }
 
+/** One swatch per class with how many objects the current sample holds. */
+function Classes({ meta, state, frame }: { meta: LayerMeta; state: LayerState; frame: number }) {
+  const indexed = state.layers[meta.layer]
+  if (!indexed || indexed.layer.type !== 'polygons') return null
+  const { layer } = indexed
+  const key = pickSample(indexed.keys, frame, layer.max_age_frames)
+  const counts = key === null ? null : countByClass(layer, layer.frames[String(key)])
+  return (
+    <ul className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+      {(counts ?? layer.classes.map((c) => [c, null] as const)).map(([cls, n]) => (
+        <li key={cls} className="flex items-center gap-1.5 rounded-md bg-slate-950/60 px-2 py-1.5">
+          <span className="size-2.5 rounded-sm" style={{ background: classColour(layer.classes, cls) }} />
+          <span className="text-slate-300">{cls}</span>
+          <span className="ml-auto font-semibold tabular-nums text-slate-100">{n ?? ''}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** How many points or tracks the current sample holds. */
+function Count({ meta, state, frame }: { meta: LayerMeta; state: LayerState; frame: number }) {
+  const indexed = state.layers[meta.layer]
+  if (!indexed || (indexed.layer.type !== 'points' && indexed.layer.type !== 'tracks')) return null
+  const key = pickSample(indexed.keys, frame, indexed.layer.max_age_frames)
+  if (key === null) return null
+  const n = indexed.layer.frames[String(key)].length
+  return (
+    <p className="mt-2 text-xs text-slate-400">
+      <span className="text-sm font-semibold tabular-nums text-slate-100">{n}</span> {meta.type} at this frame
+    </p>
+  )
+}
+
 function Legend({ meta, state }: { meta: LayerMeta; state: LayerState }) {
   const indexed = state.layers[meta.layer]
   if (!indexed || indexed.layer.type !== 'grid') return null
@@ -67,7 +101,7 @@ function Legend({ meta, state }: { meta: LayerMeta; state: LayerState }) {
   if (mode.kind === 'arrows') {
     return (
       <p className="mt-1 text-xs text-slate-400">
-        Arrow length is proportional to speed; the longest is {fmt(top)} {units}.
+        Arrow length is proportional to speed; a full length arrow is {fmt(top)} {units}.
       </p>
     )
   }
@@ -112,6 +146,8 @@ export function LayerPanel(p: Props) {
                 <>
                   <Legend meta={meta} state={p.state} />
                   <Now meta={meta} state={p.state} frame={p.frame} />
+                  <Classes meta={meta} state={p.state} frame={p.frame} />
+                  <Count meta={meta} state={p.state} frame={p.frame} />
                 </>
               )}
             </li>

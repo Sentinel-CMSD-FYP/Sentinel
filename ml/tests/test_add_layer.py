@@ -252,3 +252,93 @@ def test_a_saved_clip_still_passes_the_contract_validator(tmp_path):
     tool.add_layer(clip, save(tmp_path / "t.json", tracks()))
     results = mod.validate_clip_dir(clip)
     assert all(not errs for errs in results.values()), results
+
+
+# ---- files in the Models B and E format (docs/contracts.md v1.0) ----
+
+SAMPLES = Path(__file__).resolve().parents[2] / "docs" / "samples"
+
+
+def contract_doc(frames, **extra):
+    return {"schema_version": "1.0", "clip_id": "c1", "frame_size": SIZE, "fps": 25,
+            "frame_stride": 1, "altitude_m": 60.0, "altitude_source": "assumed_constant",
+            "frames": frames, **extra}
+
+
+def write(path: Path, doc) -> Path:
+    path.write_text(json.dumps(doc))
+    return path
+
+
+def test_a_v1_points_file_is_added_as_it_is(tmp_path):
+    clip = make_clip(tmp_path)
+    f = write(tmp_path / "c1_points.json", contract_doc({"0": [[10.0, 20.0, 0.9]]}))
+    tool.add_layer(clip, f)
+    saved = json.loads((clip / "layers" / "points.json").read_text())
+    assert (saved["type"], saved["layer"], saved["schema_version"]) == ("points", "points", 1)
+    assert saved["max_age_frames"] == 1
+    assert saved["altitude_m"] == 60.0 and saved["frame_stride"] == 1  # extra fields are kept
+    assert json.loads((clip / "clip.json").read_text())["layers"][0]["type"] == "points"
+
+
+def test_a_v1_tracks_file_is_added_as_it_is(tmp_path):
+    clip = make_clip(tmp_path)
+    f = write(tmp_path / "c1_tracks.json", contract_doc({"0": [[7, 10.0, 20.0, 0.9]]}))
+    tool.add_layer(clip, f)
+    assert json.loads((clip / "layers" / "tracks.json").read_text())["type"] == "tracks"
+
+
+def test_frame_stride_sets_how_long_a_sample_stays_up(tmp_path):
+    clip = make_clip(tmp_path)
+    f = write(tmp_path / "c1_points.json", contract_doc({"0": [[1.0, 2.0, 1.0]]}, frame_stride=5))
+    tool.add_layer(clip, f)
+    assert json.loads((clip / "layers" / "points.json").read_text())["max_age_frames"] == 5
+
+
+def test_max_age_overrides_the_default(tmp_path):
+    clip = make_clip(tmp_path)
+    f = write(tmp_path / "c1_points.json", contract_doc({"0": [[1.0, 2.0, 1.0]]}, frame_stride=5))
+    tool.add_layer(clip, f, max_age=12)
+    assert json.loads((clip / "layers" / "points.json").read_text())["max_age_frames"] == 12
+
+
+def test_a_v1_file_needs_a_kind_when_the_name_does_not_say(tmp_path):
+    clip = make_clip(tmp_path)
+    f = write(tmp_path / "output.json", contract_doc({"0": [[1.0, 2.0, 1.0]]}))
+    with pytest.raises(tool.LayerError, match="points or tracks"):
+        tool.add_layer(clip, f)
+    tool.add_layer(clip, f, kind="points")
+
+
+def test_an_unknown_contract_version_is_refused(tmp_path):
+    clip = make_clip(tmp_path)
+    f = write(tmp_path / "c1_points.json", contract_doc({"0": []}, schema_version="2.0"))
+    with pytest.raises(tool.LayerError, match="2.0"):
+        tool.add_layer(clip, f)
+
+
+def test_a_v1_file_still_gets_the_usual_checks(tmp_path):
+    clip = make_clip(tmp_path)
+    wrong_clip = contract_doc({"0": [[1.0, 2.0, 1.0]]}, clip_id="other")
+    with pytest.raises(tool.LayerError, match="clip_id"):
+        tool.add_layer(clip, write(tmp_path / "a_points.json", wrong_clip))
+    beyond = contract_doc({"500": [[1.0, 2.0, 1.0]]})
+    with pytest.raises(tool.LayerError, match="beyond"):
+        tool.add_layer(clip, write(tmp_path / "b_points.json", beyond))
+    assert not (clip / "layers" / "points.json").exists()
+
+
+@pytest.mark.parametrize("sample, kind", [("clip_011_points.json", "points"),
+                                          ("clip_011_tracks.json", "tracks")])
+def test_the_real_contract_samples_load_into_a_clip(tmp_path, sample, kind):
+    if not (SAMPLES / sample).is_file():
+        pytest.skip("contract samples are not available here")
+    clip = tmp_path / "dc_011"
+    (clip / "layers").mkdir(parents=True)
+    (clip / "clip.json").write_text(json.dumps({
+        "schema_version": 1, "clip_id": "dc_011", "name": "DroneCrowd 011", "fps": 25.0,
+        "frame_size": [1920, 1080], "n_frames": 300, "layers": []}))
+    tool.add_layer(clip, SAMPLES / sample, fix_clip_id=True)
+    saved = json.loads((clip / "layers" / f"{kind}.json").read_text())
+    assert saved["type"] == kind and saved["clip_id"] == "dc_011"
+    assert json.loads((clip / "clip.json").read_text())["layers"][0]["layer"] == kind

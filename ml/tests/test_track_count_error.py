@@ -122,3 +122,11 @@ def test_label_comes_from_the_tracker_config_including_cmc_and_altitude_status()
     assert "no CMC" in label and "no altitude scaling" in label
     on = tc.describe_tracker({**base, "use_cmc": True, "use_altitude": True})
     assert "CMC on" in on and "altitude-scaled gate" in on and "no CMC" not in on
+
+
+def test_label_shows_the_miss_limit_in_seconds_when_it_is_given_in_seconds():
+    cfg = {"score_thr": 0.35, "min_hits": 3, "max_age": 25, "max_age_s": 3.0}
+    label = tc.describe_tracker(cfg)
+    assert "max_age 3 s" in label and "25" not in label  # the stale frames value is not shown
+    frames = tc.describe_tracker({"score_thr": 0.35, "min_hits": 3, "max_age": 25})
+    assert "max_age 25 frames" in frames

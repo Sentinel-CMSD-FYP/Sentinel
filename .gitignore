@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-label/
 venv/
 *.egg-info/
 .pytest_cache/
@@ -54,9 +55,8 @@ simulation/**/log/
 .idea/
 .DS_Store
 Thumbs.db
-
+# Claude roadmap (local only)
 CLAUDE.md
 ROADMAP.md
-docs/decisions/
 
 ml/third_party/

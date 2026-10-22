@@ -142,8 +142,9 @@ The frontend downloads each layer once and shows the entry that matches the curr
 - What does the fifth model output? It should fit grid, points or tracks; if it does not, a
   fourth type is needed.
 - Flow's real grid size, and whether flow also sends speed variance for the Tier 2 features.
-- Ahmed: this extends docs/contracts.md (the points and tracks formats). Please confirm the
-  formats above match what Models B and E will output.
+- Ahmed: docs/contracts.md v1.0 files are accepted as they are (add_layer.py converts them), so
+  Models B and E do not need to change their output. Please confirm that frame_stride is the
+  right default for how long a sample stays up.
 
 ## check_layer.py
 

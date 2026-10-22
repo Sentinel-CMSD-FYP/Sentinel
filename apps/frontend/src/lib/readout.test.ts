@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GridLayer } from '../types'
-import { cellAt, fmt, heading, readCell, summarise, unitLabel } from './readout'
+import { cellAt, fmt, heading, insidePolygon, objectAt, readCell, summarise, unitLabel } from './readout'
 
 const layer: GridLayer = {
   schema_version: 1,
@@ -87,5 +87,25 @@ describe('unitLabel', () => {
     expect(unitLabel('m_per_s')).toBe('m/s')
     expect(unitLabel('px_per_frame')).toBe('px/frame')
     expect(unitLabel('people_per_m2')).toBe('people/m2')
+  })
+})
+
+describe('objects under the pointer', () => {
+  const square: [number, number][] = [[0, 0], [10, 0], [10, 10], [0, 10]]
+  const ell: [number, number][] = [[0, 0], [10, 0], [10, 4], [4, 4], [4, 10], [0, 10]]
+
+  it('tells inside from outside, also in a concave outline', () => {
+    expect(insidePolygon(square, 5, 5)).toBe(true)
+    expect(insidePolygon(square, 15, 5)).toBe(false)
+    expect(insidePolygon(ell, 2, 8)).toBe(true)
+    expect(insidePolygon(ell, 8, 8)).toBe(false) // inside the box, outside the L
+  })
+
+  it('picks the object drawn last (on top), or none', () => {
+    const a = { cls: 'wall', score: 0.9, box: [0, 0, 10, 10] as [number, number, number, number], polygon: square }
+    const b = { cls: 'obstruction', score: 0.5, box: [0, 0, 10, 10] as [number, number, number, number], polygon: ell }
+    expect(objectAt([a, b], 2, 2)?.cls).toBe('obstruction')
+    expect(objectAt([a, b], 8, 8)?.cls).toBe('wall')
+    expect(objectAt([a, b], 20, 20)).toBeNull()
   })
 })

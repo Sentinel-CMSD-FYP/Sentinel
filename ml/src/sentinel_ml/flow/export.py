@@ -20,7 +20,6 @@ import argparse
 import json
 import shutil
 import subprocess
-import time
 from dataclasses import dataclass, replace
 from itertools import islice
 from pathlib import Path
@@ -28,77 +27,20 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from sentinel_ml.geometry import NadirCamera
-
-from .camera import remove_camera_motion
-from .farneback import FarnebackConfig, FarnebackFlow, pool_regions
+from .farneback import FarnebackConfig
+from .layer import FlowLayerConfig, FlowModule, cell_texture, centre_mask
 from .sources import open_frames
+
+__all__ = ["ExportConfig", "cell_texture", "centre_mask", "export_flow", "find_ffmpeg"]
 
 
 @dataclass(frozen=True)
-class ExportConfig:
-    rows: int = 6
-    cols: int = 10
-    every: int | None = None  # frames between samples; None means about one per second
-    gap: int = 5  # frames between the two images of each flow pair
-    # A cell with less image texture than this has no reliable flow, so it is marked invalid
-    # (a gap) and not drawn. Texture is the mean image gradient in grey levels per pixel.
-    min_texture: float = 1.5
+class ExportConfig(FlowLayerConfig):
+    """The flow layer settings (``layer.FlowLayerConfig``) plus what export does to the video."""
+
     max_width: int = 1920  # larger videos are shrunk to this; smaller ones are kept
     start: int = 0
     max_frames: int | None = None
-    # Subtract the camera's own shift, zoom and rotation, fitted to the flow (see camera.py).
-    # A sample where too little of the frame agreed on one camera motion is left out entirely:
-    # a gap, not a guess.
-    stabilise: bool = True
-    min_inliers: float = 0.5
-    # Keep only cells whose centre is in the middle `centre_fraction` of the frame (1.0 = all).
-    # Other cells are marked invalid. Useful where the fit is weakest, at the edges of a zoom.
-    centre_fraction: float = 1.0
-    # With both set, flow is written in metres per second instead of pixels per frame, using
-    # the ground sampling distance of a straight-down camera (see sentinel_ml.geometry). Neither
-    # is known for DroneCrowd or YouTube clips, so these are assumptions the caller owns.
-    altitude_m: float | None = None
-    hfov_deg: float | None = None
-
-    def __post_init__(self) -> None:
-        if self.rows < 1 or self.cols < 1:
-            raise ValueError("rows and cols must be positive")
-        if self.gap < 1:
-            raise ValueError("gap must be at least 1 frame")
-        if self.every is not None and self.every < 1:
-            raise ValueError("every must be at least 1 frame")
-        if not 0.0 < self.centre_fraction <= 1.0:
-            raise ValueError("centre_fraction must be in (0, 1]")
-        if not 0.0 <= self.min_inliers <= 1.0:
-            raise ValueError("min_inliers must be in [0, 1]")
-        if (self.altitude_m is None) != (self.hfov_deg is None):
-            raise ValueError("altitude_m and hfov_deg must be given together")
-        if self.altitude_m is not None:
-            NadirCamera(self.altitude_m, self.hfov_deg, 1)  # validates the ranges
-
-
-def centre_mask(rows: int, cols: int, fraction: float) -> np.ndarray:
-    """True for cells whose centre lies inside the middle ``fraction`` of the frame."""
-    cy = (np.arange(rows) + 0.5) / rows - 0.5
-    cx = (np.arange(cols) + 0.5) / cols - 0.5
-    half = fraction / 2 + 1e-9
-    return (np.abs(cy)[:, None] <= half) & (np.abs(cx)[None, :] <= half)
-
-
-def cell_texture(gray: np.ndarray, rows: int, cols: int) -> np.ndarray:
-    """Mean gradient magnitude per grid cell, in grey levels per pixel."""
-    g = gray.astype(np.float32)
-    # The Sobel kernel has a gain of 8 on a unit gradient; divide it out.
-    mag = (np.abs(cv2.Sobel(g, cv2.CV_32F, 1, 0)) + np.abs(cv2.Sobel(g, cv2.CV_32F, 0, 1))) / 8.0
-    h, w = mag.shape
-    ys = np.linspace(0, h, rows + 1).astype(int)
-    xs = np.linspace(0, w, cols + 1).astype(int)
-    out = np.empty((rows, cols), np.float32)
-    for r in range(rows):
-        for c in range(cols):
-            out[r, c] = mag[ys[r] : ys[r + 1], xs[c] : xs[c + 1]].mean()
-    return out
 
 
 def find_ffmpeg() -> str | None:
@@ -160,71 +102,26 @@ def export_flow(
     if not writer.isOpened():
         raise RuntimeError(f"cannot write {video}")
 
-    model = FarnebackFlow(fcfg)
-    every = cfg.every or max(1, round(src_fps))
-    pending: dict[int, np.ndarray] = {}
-    samples: dict[str, dict] = {}
-    camera: dict[str, dict] = {}
-    flow_ms: list[float] = []
-    speeds: list[float] = []
-    speeds_raw: list[float] = []
-    inside = centre_mask(cfg.rows, cfg.cols, cfg.centre_fraction)
-    # Ground sampling distance is for the pixels flow is measured in: the written video, after
-    # any shrinking, which keeps the field of view.
-    metric = cfg.altitude_m is not None
-    gsd_m = NadirCamera(cfg.altitude_m, cfg.hfov_deg, width).gsd if metric else None
-    to_units = gsd_m * src_fps if metric else 1.0  # px per frame -> m/s (or unchanged)
-    units = "m_per_s" if metric else "px_per_frame"
+    module = FlowModule(cfg, fcfg, fps=src_fps)
     n = 0
 
     for idx, frame in enumerate(frames):
         if resize:
             frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
         writer.write(frame)
+        module.process(idx, frame)
         n = idx + 1
-
-        if idx % every == 0:
-            pending[idx] = frame
-        prev = pending.pop(idx - cfg.gap, None)
-        if prev is None:
-            continue
-
-        t0 = time.perf_counter()
-        flow = model.compute(prev, frame)
-        flow_ms.append((time.perf_counter() - t0) * 1000)
-        k = 1.0 / cfg.gap  # pixels over the gap -> pixels per frame
-        at = str(idx - cfg.gap)
-
-        if cfg.stabilise:
-            speeds_raw.append(float(flow.magnitude.mean()) * k)
-            flow, cam = remove_camera_motion(flow, (width, height))
-            reliable = cam.reliable(cfg.min_inliers)
-            camera[at] = {**cam.per_second(cfg.gap, src_fps), "used": reliable}
-            if not reliable:
-                continue  # camera motion is ambiguous here; say nothing for this sample
-
-        pooled = pool_regions(flow, cfg.rows, cfg.cols)
-        valid = cell_texture(model.prepare(prev), cfg.rows, cfg.cols) >= cfg.min_texture
-        valid &= inside
-        samples[at] = {
-            "valid": valid.astype(int).tolist(),
-            "u": np.round(pooled.mean_u * k * to_units, 4).tolist(),
-            "v": np.round(pooled.mean_v * k * to_units, 4).tolist(),
-            "speed": np.round(pooled.mean_speed * k * to_units, 4).tolist(),
-        }
-        speeds.append(float(pooled.mean_speed[valid].mean() * k) if valid.any() else 0.0)
 
     writer.release()
     if n == 0:
         raise RuntimeError(f"no frames read from {source}")
     playable = to_h264(video)
 
-    layer = {
-        "schema_version": 1, "clip_id": clip_id, "layer": "flow", "type": "grid",
-        "frame_size": [width, height], "grid": {"rows": cfg.rows, "cols": cfg.cols},
-        "units": units, "fields": ["u", "v", "speed"], "max_age_frames": every,
-        "frames": samples,
-    }
+    layer = module.layer(clip_id)
+    every, units, gsd_m, samples = module.every, module.units, module.gsd_m, layer["frames"]
+    camera = {at: {**cam.per_second(cfg.gap, src_fps), "used": used}
+              for at, (cam, used) in module.camera.items()}
+    flow_ms, speeds, speeds_raw = module.flow_ms, module.speeds, module.speeds_raw
     clip = {
         "schema_version": 1, "clip_id": clip_id, "name": name or clip_id, "fps": src_fps,
         "frame_size": [width, height], "n_frames": n,

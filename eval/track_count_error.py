@@ -77,8 +77,12 @@ def describe_tracker(tracker_cfg: dict) -> str:
     """Label of the tracker settings, read from the config that produced the tracks."""
     cmc = "CMC on" if tracker_cfg.get("use_cmc") else "no CMC"
     alt = "altitude-scaled gate" if tracker_cfg.get("use_altitude") else "no altitude scaling"
+    if tracker_cfg.get("max_age_s") is not None:  # the seconds value replaces the frames value
+        age = f"max_age {tracker_cfg['max_age_s']:g} s"
+    else:
+        age = f"max_age {tracker_cfg['max_age']} frames"
     return (f"tracker on B points (score_thr {tracker_cfg['score_thr']}, min_hits "
-            f"{tracker_cfg['min_hits']}, max_age {tracker_cfg['max_age']}), {cmc}, {alt}")
+            f"{tracker_cfg['min_hits']}, {age}), {cmc}, {alt}")
 
 
 def load_tags(path: Path, split: str) -> dict[int, str] | None:
@@ -140,6 +144,7 @@ def main() -> None:
     ap.add_argument("--tracker-config", type=Path, required=True,
                     help="the tracker yaml that produced the tracks (used for the label)")
     ap.add_argument("--out-dir", type=Path, help="default: <out_dir>/<split>")
+    ap.add_argument("--note", default="", help="text appended to the label, e.g. a run name")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(args.config.read_text())
@@ -162,7 +167,7 @@ def main() -> None:
     summary = summarise(rows, tags)
     tracker_cfg = yaml.safe_load(args.tracker_config.read_text())["tracker"]
     label = (f"DroneCrowd {args.split} split, {len(rows)} clips, {describe_tracker(tracker_cfg)}, "
-             "DroneCrowd only")
+             "DroneCrowd only" + (f" [{args.note}]" if args.note else ""))
     print(label)
     print(format_report(rows, summary, float(cfg["provisional_target_pct"])))
     meta = {"label": label, "split": args.split, "tracker": tracker_cfg,

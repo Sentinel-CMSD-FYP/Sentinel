@@ -5,14 +5,15 @@
 > Do not change after the team agrees without a note in `docs/decisions/`.
 
 The frontend plays a video and draws toggleable layers on top. Each model produces one layer. The
-backend stores layers and serves them. Every layer is one of three **types**, so the frontend needs
-only three renderers and adding a model does not need frontend work.
+backend stores layers and serves them. Every layer is one of four **types**, so the frontend needs
+only four renderers and adding a model does not need frontend work.
 
 | type | one entry per frame holds | drawn as | example |
 |---|---|---|---|
 | `grid` | named matrices, one value per cell, plus a `valid` mask | heatmap or arrows | flow, density |
 | `points` | rows of `[x, y, score]` | dots | localization (Model B) |
 | `tracks` | rows of `[track_id, x, y, score]` | dots with trails | tracking (Model E) |
+| `polygons` | objects `{cls, score, box, polygon}` plus a layer level `classes` list | outlines, one colour per class | infrastructure (Model C) |
 
 ## Conventions
 
@@ -31,7 +32,10 @@ can become ground cells with the same fields, without changing the format.
 - **Units are explicit.** Flow is `px_per_frame` in original-frame pixels until a ground conversion
   exists; then it becomes `m_per_s` and the `units` field says so. The flow exporter writes `m_per_s`
   when it is given `--altitude` and `--hfov` (a straight-down camera over flat ground is assumed;
-  see `docs/decisions/0006-geometry-ground-sampling.md`).
+  see `docs/decisions/0006-geometry-ground-sampling.md`). The pipeline's flow module writes `m_per_s`
+  when clip.json has a `camera` block (`altitude_m`, `hfov_deg`, `altitude_source` assumed, stated
+  or telemetry; optional `model`, `dfov_deg`, `sensor_aspect`), set by `ingest_clip --altitude` or
+  the upload form.
 - **Models may run slower than the video.** Flow and density at about 1 Hz are normal. Entries are
   sparse; they are not required for every frame.
 - **Dwell before risk.** A risk layer (later) must not emit a score for a cell until its history fills
@@ -116,6 +120,13 @@ different file or resolution), or uses frame numbers beyond the clip. It also re
 existing layer unless `--replace` is given, and `--remove NAME` takes a layer out again. Grids start
 visible and dots and tracks start hidden (`--visible` / `--hidden` override), and a grid with `u` and `v`
 fields is drawn as arrows, any other grid as a heatmap of its first field (`--field` picks another).
+
+Models B and E can hand over their files exactly as `docs/contracts.md` v1.0 defines them. `add_layer.py`
+recognises that format (a string `schema_version` of `"1.0"` and no `type`), takes the layer type from the
+file name (`<clip>_points.json`, `<clip>_tracks.json`, or `--kind`), and sets `max_age_frames` from the
+file's `frame_stride` (`--max-age` overrides). Their extra header fields (`fps`, `frame_stride`,
+`altitude_m`, `altitude_source`) are kept, and every other check above still applies. If their
+`clip_id` differs from the clip folder's (for example `clip_011` and `dc_011`), add `--fix-clip-id`.
 
 The fake clip (`make_sample_clip.py`) is generated, not committed (`data/` is gitignored). It is
 simulated crowd data, not model output, with a deliberate gap in the flow layer (frames 100 to 149)
