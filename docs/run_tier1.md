@@ -14,7 +14,7 @@ How a clip flows through the system: `docs/pipeline.md`. Per model facts: `docs/
 
 ## 2. Install (one Python environment for models and backend)
 
-From the repo root (Windows: `.venv\Scripts\activate`):
+From the repo root (Windows PowerShell: `.venv\Scripts\Activate.ps1`):
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -27,7 +27,7 @@ python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_
 
 The backend and the models share this environment: `run_models` imports `sentinel_ml` and torch.
 The database is SQLite by default (`python apps/backend/manage.py migrate` once); Postgres and
-Redis from `infra/docker-compose.yml` are not needed for Tier 1.
+Redis from `infra/compose.yaml` are not needed for Tier 1.
 
 ## 3. Weights
 
