@@ -1,0 +1,27 @@
+# GPU dev container for Model B + E.   Run from the repo root:
+#   docker compose -f infra/ml/compose.gpu.yaml build
+#   docker compose -f infra/ml/compose.gpu.yaml run --rm ml bash
+services:
+  ml:
+    image: sentinel-ml-gpu
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    working_dir: /workspace
+    volumes:
+      - ../../:/workspace            # whole repo: code, configs, data/, third_party/
+      - hf_torch_cache:/home/dev/.cache   # timm/torch download cache (ImageNet encoder weights)
+    shm_size: "8gb"
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+volumes:
+  hf_torch_cache:
