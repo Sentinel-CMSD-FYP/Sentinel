@@ -1,6 +1,16 @@
-# GPU dev container for Model B + E.   Run from the repo root:
-#   docker compose -f infra/ml/compose.gpu.yaml build
-#   docker compose -f infra/ml/compose.gpu.yaml run --rm ml bash
+# GPU container for the Sentinel ML stack. Run from the repo root.
+#
+# Per-person project name, so two people never collide (no fixed container names, no host ports):
+#   export UID GID=$(id -g)
+#   docker compose -p sentinel-$USER -f infra/ml/compose.gpu.yaml build          # first person only
+#   docker compose -p sentinel-$USER -f infra/ml/compose.gpu.yaml run --rm ml bash
+#
+# The image tag `sentinel-ml-gpu` is shared by everyone on the PC. Build it once; others skip it: `run` only builds when the image is missing.
+# The container runs as YOUR uid/gid (see `user:`), so files in data/outputs are yours, not root's.
+#
+# Dataset location (read-only in the container):
+#   SENTINEL_DATA_DIR=/srv/sentinel/datasets/dronecrowd   (shared copy on the PC)
+# Default is the in-repo path data/dronecrowd, so a laptop with its own copy still works.
 services:
   ml:
     image: sentinel-ml-gpu
@@ -9,10 +19,15 @@ services:
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}"
     working_dir: /workspace
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /cache       # timm/torch downloads (ImageNet encoder weights)
     volumes:
-      - ../../:/workspace            # whole repo: code, configs, data/, third_party/
-      - hf_torch_cache:/home/dev/.cache   # timm/torch download cache (ImageNet encoder weights)
+      - ../../:/workspace                                                           # your clone: code, configs, data/outputs, third_party
+      - ${SENTINEL_DATA_DIR:-../../data/dronecrowd}:/workspace/data/dronecrowd:ro   # dataset, read-only
+      - ${SENTINEL_CACHE_DIR:-${HOME}/.cache/sentinel-container}:/cache             # per-user download cache
     shm_size: "8gb"
     stdin_open: true
     tty: true
@@ -23,5 +38,3 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-volumes:
-  hf_torch_cache:
