@@ -60,3 +60,9 @@ ROADMAP.md
 docs/decisions/
 
 ml/third_party/
+
+# Local docs (not for git)
+docs/F26_083_i230828_p230686_i230644.pdf
+docs/Sentinel_Sprint_Plan.html
+docs/viva-guide.html
+docs/cc-prompt-immediate.md

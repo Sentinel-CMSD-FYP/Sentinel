@@ -13,14 +13,14 @@ produce them are in `eval/` and `ml/src/sentinel_ml/`.
 | Tracking count error, >=45-frame filter (offline) | 38.7% mean (median 30.4%) | same run |
 | Tracking count error, run 2 (frozen E-2 config) | 35.2% unfiltered, 37.9% filtered (>=45 frames), mean over clips | DroneCrowd test, second look, not blind, no CMC, no altitude scaling |
 | IDF1 / HOTA, run 2 | 0.388 / 0.300 (run 1: 0.384 / 0.298) | TrackEval IoU 0.5, DroneCrowd test, mean over clips |
-| B speed | 4.79 frames/s (val), 4.78 (test), model only | Kaggle T4, not the 4070, not B+E |
+| B speed | 4.79 frames/s (val), 4.78 (test), model only | Kaggle T4, not the RTX 4000 Ada, not B+E |
 | E speed, B+E benchmark | not measured yet | |
 No numeric F1 target exists; the count targets in the draft Phase 0 sheet (unsigned) are treated as
 provisional and nothing is marked pass or fail.
 
 ## 11 Oct: kickoff, dataset, split
 - Agreed with Mahid and Ahmar: DroneCrowd primary, UP-COUNT secondary. The JSON formats were accepted
-  as drafted. GPU work on the 4070, with Kaggle as the fallback. Night footage is not excluded: if the
+  as drafted. GPU work on the RTX 4000 Ada, with Kaggle as the fallback. Night footage is not excluded: if the
   dataset has it, it is used for training and testing. Split and F1 target left open.
 - Downloaded DroneCrowd to `data/dronecrowd` (11 GB) and inspected it with `eval/inspect_dataset.py`:
   112 clips of 300 frames, 1920x1080; 82 train and 30 test clips; ground truth per frame in `.mat`
@@ -320,7 +320,7 @@ provisional and nothing is marked pass or fail.
   against the provisional 35%, IDF1 0.388, HOTA 0.300, the shortfall set by B's detections on night, dusk and
   large-scale clips), and treat improving B as the next investment, scoped before any GPU hours are spent
   (training on the 72 train clips would also give a clean val). E-4 (ID-stability clips) and E-5 (B+E speed on
-  the 4070) are still to do, then integration.
+  the RTX 4000 Ada) are still to do, then integration.
 
 - Decision after the oracle: DDCF is closed and not built (the rule I set before the run said no). For the
   tracker I accept and report the limitation (filtered count error 37.9% against the provisional 35%, IDF1
@@ -329,19 +329,28 @@ provisional and nothing is marked pass or fail.
   scope; dusk is reported separately with no target. Next: E-5 (B+E speed, average and p95 frames/s per
   stream with 3 to 4 streams), then E-4 (ID-stability clips), then the B note.
 
-- E-5 (B+E speed) is written and tested on CPU, but not measured: the 4070 is not available right now. No
-  Kaggle interim number (a T4 miss would say little about the 4070). Status in every table: "not measured
-  (4070 unavailable)". I will book the 4070 and run it myself. Script: `eval/benchmark_be.py`.
+- E-5 (B+E speed) is written and tested on CPU, but not measured: the RTX 4000 Ada is not available right now. No
+  Kaggle interim number (a T4 miss would say little about the RTX 4000 Ada). Status in every table: "not measured
+  (RTX 4000 Ada unavailable)". I will book the RTX 4000 Ada and run it myself. Script: `eval/benchmark_be.py`.
 - E-4 (ID-stability clips): picked the clips by a rule written before rendering, so I do not cherry-pick: rank
   the 30 test clips by run-2 IDF1, take the 4 highest, the 4 lowest and 4 random (seed 0) from the rest; 10 s
   of footage each, from the frozen run-2 tracks. File names carry only the clip number, and the group and
   numbers are in a separate `index.csv` that I open after watching. My judgement is recorded below once I have
   watched them.
 
+- E-4 watched (12 clips, 10 s each, run-2 tracks, test, picked by rule). By eye, with "few" = a couple of people
+  and "some" = 2 to 3 out of 10: clips 16, 22, 23, 24 and 101 are overall stable (a few wrong merges, a few
+  fragments or untracked people); 62 and 63 lose a few people; 17, 18, 108 only have a few people marked at
+  all, 74 (night) has some tracked with id switches, and in 82 about 35% of people in dark areas are not
+  tracked. Best: 23, 24. Worst: 17, 18, 108. This matches the IDF1 ranking (my best two are in the metric-best
+  four, my worst three are in the metric-worst four). The bad clips are B missing people, not id problems.
+  One thing I did not resolve: clips 22 to 24 have 510 to 579 id switches by TrackEval but looked stable by eye.
+  Notes in `docs/decisions/0011-e4-id-stability.md`.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.
-- E-4 (ID-stability videos, best and worst clips, my judgement) and E-5 (B+E speed on the 4070 with nothing
+- E-4 (ID-stability videos, best and worst clips, my judgement) and E-5 (B+E speed on the RTX 4000 Ada with nothing
   else running, target 5 frames/s per stream; Kaggle only as fallback).
 - (Closed 18 Oct: DDCF not built, see above.) Earlier question: whether DDCF is needed for the count target, and whether to keep the 25% figure (the draft Phase 0
   sheet is unsigned and says E reaches it only with DDCF in the authors' results). Tell the supervisor.
@@ -350,3 +359,5 @@ provisional and nothing is marked pass or fail.
 - CI has not run on this branch yet (it runs on pushes to `main` and on pull requests); open a pull request.
 - Whether B should be trained on the 72 train clips only, to remove the val contamination; not done, GPU
   hours not measured.
+
+- 2026-11-23, E-5 measured on the RTX 4000 Ada (GPU idle before the run, label "alone"). DroneCrowd test clips 11, 15, 16, 17, 250 timed frames per stream after 10 warm-up, fp32, stride 1, frozen run-2 tracker. 1 stream: avg 10.20 FPS, p95 10.12 (target 5: met). 3 streams: lowest stream avg 4.43, p95 3.59 (not met). 4 streams: lowest avg 3.32, p95 2.74 (not met). Total throughput about 13.7 FPS from 3 streams on. Benchmark script now also records CUDA version, resolution, frame_stride, fp16 flag, stream counts (2 new CPU tests). Not run: with teammates' jobs. Details and E-6 recommendation: `docs/decisions/0012-e5-speed.md`. E-6 not started.
