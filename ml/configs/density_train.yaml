@@ -1,0 +1,16 @@
+# DM-Count fine tune on DroneCrowd (step 8, sentinel_ml.density.train).
+# DM-Count's published QNRF settings (train.py, commit cc5f213); data and strides come from density_data.yaml.
+init_weights: data/weights/dmcount/model_qnrf.pth  # start point, relative to the repo root; Kaggle passes --init-weights
+crop_size: 512          # random square crop per frame per epoch, plus a random horizontal flip
+batch_size: 10
+lr: 1.0e-5              # Adam
+weight_decay: 1.0e-4
+wot: 0.1                # weight of the OT loss
+wtv: 0.01               # weight of the TV loss (the count loss has weight 1)
+ot_reg: 10.0            # Sinkhorn entropy regularisation
+ot_iters: 100           # Sinkhorn iterations
+num_workers: 4          # Kaggle kernels have 4 CPUs
+log_every: 50           # steps between running loss prints
+seed: 0
+time_limit_h: 11.0      # no new epoch past this, so a 12 h Kaggle session can save and exit
+patience: 4             # early stop after this many epochs without a new best val MAE (0 = off)

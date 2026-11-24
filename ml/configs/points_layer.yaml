@@ -1,0 +1,8 @@
+# Model B points as a points layer (step 23): sentinel_ml.localization.layer.
+# The model itself is set up by infer_b.yaml (repo, checkpoint, net input, min_score).
+
+score_thr: 0.2       # B's operating threshold, chosen on val (docs/project-log.md, 14 Oct)
+every: 1             # run on every frame, as B and E were evaluated (frame_stride 1)
+max_age_frames: 1    # a sample stays on screen until the next frame
+xy_decimals: 1       # rounding in the JSON, as in B's points files
+score_decimals: 4

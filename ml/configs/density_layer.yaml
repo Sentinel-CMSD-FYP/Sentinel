@@ -1,0 +1,8 @@
+# DM-Count output as a grid layer (step 16): sentinel_ml.density.layer.
+# Layer contract: docs/layers/layers.md on main (grid type). Zone value = people in that zone.
+
+rows: 9              # zone grid, 9 x 16 = 120 px zones at 1920x1080 (as in Mahid's sample)
+cols: 16
+every: 25            # run on frame ids that are multiples of this (1 Hz at 25 fps)
+max_age_frames: 25   # a sample stays on screen until the next one
+decimals: 3          # rounding of people per zone in the JSON

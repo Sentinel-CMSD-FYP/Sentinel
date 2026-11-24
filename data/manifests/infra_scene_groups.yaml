@@ -1,0 +1,68 @@
+# Model C (YOLO26 infrastructure) scene groups: DroneCrowd clips that show the same place.
+# A group always goes wholly to train or wholly to val (step 14), so val mAP is measured on
+# unseen places. Every clip 1..112 appears exactly once; singletons are listed too.
+# Built 2026.10.19: ORB feature matching of frame 150 between all clip pairs (RANSAC homography
+# inliers >= 30; same place pairs scored 400 to 1900, others under 30, except 85/86 at 68 and
+# 97/98 at 35), plus merges by eye where altitude changes break matching:
+# 17/18 (plaza), 97/98/99 (market street), 106/107/109/111/112 (stall row street),
+# 100/104/110 (same curved corner building), 89/90/91 (same junction).
+
+groups:
+  - [1, 2, 64]
+  - [3, 4, 5]
+  - [6, 7, 8]
+  - [9, 10, 65]
+  - [12, 68]
+  - [13, 14, 54]
+  - [15, 16]
+  - [17, 18]
+  - [19, 20, 21]
+  - [22, 23, 24]
+  - [25, 26, 27]
+  - [28, 29, 30]
+  - [31, 32, 33]
+  - [34, 35]
+  - [36, 37, 38]
+  - [39, 40, 41]
+  - [42, 43, 44]
+  - [45, 46, 47]
+  - [48, 49, 50]
+  - [51, 52, 53]
+  - [55, 56, 57]
+  - [58, 59, 60]
+  - [61, 62, 63]
+  - [66, 67]
+  - [71, 72, 73]
+  - [85, 86]
+  - [89, 90, 91]
+  - [97, 98, 99]
+  - [100, 104, 110]
+  - [106, 107, 109, 111, 112]
+  - [11]
+  - [69]
+  - [70]
+  - [74]
+  - [75]
+  - [76]
+  - [77]
+  - [78]
+  - [79]
+  - [80]
+  - [81]
+  - [82]
+  - [83]
+  - [84]
+  - [87]
+  - [88]
+  - [92]
+  - [93]
+  - [94]
+  - [95]
+  - [96]
+  - [101]
+  - [102]
+  - [103]
+  - [105]
+  - [108]
+
+night: [69, 70, 74]   # lighting tags (data/manifests/lighting_tags.yaml); val must hold one

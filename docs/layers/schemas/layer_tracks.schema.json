@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tracks layer: person tracks per frame (Model E)",
+  "type": "object",
+  "required": ["schema_version", "clip_id", "layer", "type", "frame_size", "max_age_frames",
+               "frames"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "clip_id": {"type": "string", "minLength": 1},
+    "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "type": {"const": "tracks"},
+    "frame_size": {
+      "type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2
+    },
+    "altitude_m": {"type": "number", "exclusiveMinimum": 0},
+    "max_age_frames": {"type": "integer", "minimum": 1},
+    "frames": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[0-9]+$"},
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "prefixItems": [
+            {"type": "integer", "minimum": 0},
+            {"type": "number"},
+            {"type": "number"},
+            {"type": "number", "minimum": 0, "maximum": 1}
+          ],
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "description": "Rows of [track_id, x, y, score]. track_id is unique within the clip and never reused."
+      }
+    }
+  }
+}

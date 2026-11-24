@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Polygons layer: outlined objects per frame (Model C, infrastructure)",
+  "type": "object",
+  "required": ["schema_version", "clip_id", "layer", "type", "frame_size", "classes",
+               "max_age_frames", "frames"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "clip_id": {"type": "string", "minLength": 1},
+    "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "type": {"const": "polygons"},
+    "frame_size": {
+      "type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2
+    },
+    "classes": {
+      "type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every class name the layer can hold, in model class id order."
+    },
+    "max_age_frames": {"type": "integer", "minimum": 1},
+    "frames": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[0-9]+$"},
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["cls", "score", "box", "polygon"],
+          "additionalProperties": false,
+          "properties": {
+            "cls": {"type": "string"},
+            "score": {"type": "number", "minimum": 0, "maximum": 1},
+            "box": {
+              "type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4,
+              "description": "[x0, y0, x1, y1] in original-frame pixels."
+            },
+            "polygon": {
+              "type": "array",
+              "items": {
+                "type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2
+              },
+              "minItems": 3,
+              "description": "Outline as [x, y] points; the last point joins the first."
+            }
+          }
+        },
+        "description": "Objects sorted by score; an empty list means the frame ran and found none."
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Grid layer: one value (or vector) per cell, e.g. flow arrows or a density heatmap",
+  "type": "object",
+  "required": ["schema_version", "clip_id", "layer", "type", "frame_size", "grid", "units",
+               "fields", "max_age_frames", "frames"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "clip_id": {"type": "string", "minLength": 1},
+    "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "type": {"const": "grid"},
+    "frame_size": {
+      "type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2
+    },
+    "grid": {
+      "type": "object",
+      "required": ["rows", "cols"],
+      "properties": {
+        "rows": {"type": "integer", "minimum": 1},
+        "cols": {"type": "integer", "minimum": 1}
+      }
+    },
+    "units": {"type": "string"},
+    "fields": {
+      "type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "minItems": 1,
+      "description": "Names of the value matrices present in every frame entry, e.g. [\"u\", \"v\", \"speed\"]."
+    },
+    "max_age_frames": {
+      "type": "integer", "minimum": 1,
+      "description": "How many video frames a sample stays displayable. After that the cells are blank: gaps stay gaps."
+    },
+    "frames": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[0-9]+$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["valid"],
+        "properties": {
+          "valid": {
+            "type": "array",
+            "items": {"type": "array", "items": {"enum": [0, 1]}},
+            "description": "1 where the cell has a usable observation. Field values in cells marked 0 are ignored."
+          }
+        },
+        "additionalProperties": {
+          "type": "array", "items": {"type": "array", "items": {"type": "number"}}
+        }
+      }
+    }
+  }
+}

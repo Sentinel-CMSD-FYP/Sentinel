@@ -1,0 +1,27 @@
+# Farnebäck flow as a grid layer (step 22): sentinel_ml.flow.layer.FlowModule.
+# Same settings as flow/export.py's command line (Mahid's DroneCrowd check: downscale 0.5,
+# window 9). flow_farneback.yaml (0.25, window 15) stays as is for the tracker's camera shift.
+
+rows: 6               # grid laid over the frame, 6 x 10 cells
+cols: 10
+every: 25             # one sample every 25 frames (1 Hz at 25 fps); also its max_age_frames
+gap: 5                # frames between the two images of each flow pair
+min_texture: 1.5      # cells with less image gradient are marked invalid (no reliable flow)
+stabilise: true       # remove the camera's own shift, zoom and rotation
+min_inliers: 0.5      # drop a sample when less of the frame agrees on one camera motion
+centre_fraction: 1.0  # keep cells in the middle fraction of the frame (1.0 = all)
+# Both set: units m/s instead of px per frame (needs the clip's fps; wired in step 30).
+# DroneCrowd has neither, so they stay null.
+altitude_m: null
+hfov_deg: null
+
+farneback:
+  downscale: 0.5      # 1920x1080 -> 960x540 before computing flow
+  params:
+    pyr_scale: 0.5
+    levels: 3
+    winsize: 9
+    iterations: 3
+    poly_n: 5
+    poly_sigma: 1.2
+    flags: 0

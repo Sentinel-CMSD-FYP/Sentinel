@@ -1,0 +1,24 @@
+# YOLO26 infrastructure model (Tier 1, Model C), instance segmentation (masks).
+# Fine tuned weights from step 14 (Kaggle run sentinel-infra-train, best epoch 118). The COCO
+# model of the step 11 smoke test is data/weights/yolo26/yolo26s-seg.pt (pass it with --weights).
+# Classes map onto the SRS cell attributes proposed by the setup pass (FR9.3, FR9.4).
+
+weights: data/weights/yolo26/model_c_best.pt  # relative to the repo root (gitignored)
+base_weights: data/weights/yolo26/yolo26s-seg.pt  # COCO, base for training and vehicle drafts, downloaded if missing
+device: auto                                  # cuda if available, else cpu
+imgsz: 1280                                   # trained at 1280 (step 14)
+conf: 0.25
+# Wrapper (step 16): sentinel_ml.infrastructure.InfraModel / infrastructure_layer.
+half: true                                    # fp16 on CUDA only (same mAP as fp32, step 15)
+nms_iou: 0.5                                  # class wise NMS on boxes (YOLO26 is NMS free); null = off
+polygon_eps_px: 1.0                           # polygon simplification tolerance in pixels
+every: 125                                    # run on frame ids that are multiples of this (5 s at 25 fps)
+max_age_frames: 125                           # a sample stays on screen until the next one
+decimals: 1                                   # rounding of pixel coordinates in the JSON
+
+# Order = class id in the YOLO labels. Full rules: eval/infrastructure_yolo26/LABELLING.md.
+classes:
+  - gate_exit     # openings people pass through: gates, gaps, entrances, stair heads (SRS exit)
+  - barrier       # fences, railings, crowd barriers, hedge lines (SRS barrier)
+  - wall          # building footprints and solid walls (SRS non walkable)
+  - obstruction   # stalls, kiosks, vehicles on pedestrian space, planters, benches (SRS obstruction)

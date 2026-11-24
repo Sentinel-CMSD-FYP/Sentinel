@@ -1,0 +1,13 @@
+{
+  "id": "{user}/sentinel-infra-train",
+  "title": "sentinel-infra-train",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["{user}/sentinel-ml-src", "{user}/sentinel-infra-labels"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
