@@ -23,7 +23,7 @@ All DroneCrowd rows are the official test split (30 clips, 9,000 frames) unless 
 
 ## Notes
 - **Speed history:** the report's "4.9 to 5.3 FPS" was measured on a Kaggle T4, not on the target GPU. It is a note only; rows 7 and 8 use the RTX 4000 Ada run. Model B alone was 4.78 FPS on the T4.
-- **Tracking target (pending sign-off):** the target is **35% (25% stretch), pending sign-off**. `CLAUDE.md` says 25%, the report says 35% with 25% as stretch, and the Phase 0 sheet is unsigned. Decision is in IM-3.
+- **Tracking target (pending sign-off):** the target is **35% (25% stretch), pending sign-off**. `CLAUDE.md` used to say 25% (now reads "35% (25% stretch), pending sign-off"); the report says 35% with 25% as stretch; the Phase 0 sheet is unsigned. The note for the supervisor is `docs/supervisor-note-tracking-target.md`; the answer is still open.
 - **Why E misses:** the oracle on test shows perfect association adds only 0.066 IDF1 (0.388 to 0.454), so the limit is Model B's detections (dec and log, 18 Oct).
 - **Rows 10 to 12:** the report's own labels ("Delivered", "Met") have no numeric target behind them in Table 1.4, so they are not given Met or Gap here.
 - Multi-drone, own-footage and real-world validation: none done.
