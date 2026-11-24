@@ -14,7 +14,7 @@ produce them are in `eval/` and `ml/src/sentinel_ml/`.
 | Tracking count error, run 2 (frozen E-2 config) | 35.2% unfiltered, 37.9% filtered (>=45 frames), mean over clips | DroneCrowd test, second look, not blind, no CMC, no altitude scaling |
 | IDF1 / HOTA, run 2 | 0.388 / 0.300 (run 1: 0.384 / 0.298) | TrackEval IoU 0.5, DroneCrowd test, mean over clips |
 | B speed | 4.79 frames/s (val), 4.78 (test), model only | Kaggle T4, not the RTX 4000 Ada, not B+E |
-| E speed, B+E benchmark | not measured yet | |
+| B+E speed (measured 2026-11-23) | 1 stream 10.20 FPS avg (p95 10.12); 3 streams lowest 4.43 (p95 3.59); 4 streams lowest 3.32 (p95 2.74) | RTX 4000 Ada, DroneCrowd test clips, 250 frames per stream, fp32, GPU idle; decision 0012 |
 No numeric F1 target exists; the count targets in the draft Phase 0 sheet (unsigned) are treated as
 provisional and nothing is marked pass or fail.
 
