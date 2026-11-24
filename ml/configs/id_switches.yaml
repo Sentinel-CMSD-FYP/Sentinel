@@ -1,0 +1,14 @@
+# Config for eval/analyse_id_switches.py (IM-4). Read-only measurement on the clips and the
+# frozen run-2 tracks already scored on test (decision 0009); nothing is tuned. Paths are relative
+# to the repo root. Inputs are the MOT text files that eval/trackeval_eval.py wrote.
+work_dir: data/outputs/trackeval/test/work        # holds gt/MOT17-test and trackers/MOT17-test
+tracker_name: run2_frozen_e2                      # the frozen E-2 config, all tracks (no 45-frame filter)
+results_json: data/outputs/trackeval/test/results.json   # TrackEval's own per-clip numbers, for the check
+clips: [22, 23, 24]
+fps: 25                                           # DroneCrowd paper, arXiv 2105.02440
+first_seconds: 10                                 # the "visibly stable over 10 s" window
+iou_thresholds: [0.5, 0.3, 0.1]                   # 0.5 is the scored one; the others show sensitivity
+primary_threshold: 0.5
+near_boundary_margin: 0.1                         # a match with IoU in [thr, thr + margin) is "near the boundary"
+seed: 0                                           # nothing here is random; recorded for completeness
+out_json: data/outputs/id_switches/analysis.json
