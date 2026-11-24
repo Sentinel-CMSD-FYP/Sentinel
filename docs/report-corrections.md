@@ -40,7 +40,7 @@ Speed figures below are from `docs/decisions/0012-e5-speed.md` (RTX 4000 Ada, Dr
 
 ## Section 7.5.5 (tracking, optional but recommended)
 - Add after the count-error table: "The count error of 37.9% (filtered) misses the 35% target and the 25% stretch goal. It is a gap."
-- ID stability sentence: keep "stable by eye where B detects the people", and add "TrackEval reports 510 to 579 ID switches on clips 22 to 24 that were not visible by eye; this is being analysed (pending)." Change after IM-4.
+- ID stability sentence: keep "stable by eye where B detects the people", and add "TrackEval counts 510 to 579 ID switches on clips 22 to 24 (about 2 per person; each person receives about 2 tracks), mostly exchanges between neighbouring heads about 7 px apart and flips back to an earlier id, so identities are stable only at overview scale." Source: decision 0013 (IM-4).
 
 ## Conclusion (Chapter 10)
 - Old: "Iteration 1 completed Tier 1."
