@@ -10,6 +10,7 @@ Rules, written before any E-6 measurement:
 Results: (below, added after each step)
 
 ### Step 1: fp16 for Model B (2026-11-26)
+Code version: measured on `4f5e4bb` (main) plus the then uncommitted fp16 change, committed unchanged afterwards as `60f2860`.
 Command: `bash infra/pc/gpu-job.sh docker compose ... run --rm -T ml bash data/outputs/e6/step1.sh` (script and log under `data/outputs/e6/`). RTX 4000 Ada, torch 2.1.0+cu121, no compute process listed before the run.
 Speed (DroneCrowd test clips 11, 15, 16, 17; 250 timed frames per stream after 10 warm-up; frame_stride 1; net 1920x1088; `benchmark/e6_fp32_baseline.json`, `benchmark/e6_fp16.json`):
 
