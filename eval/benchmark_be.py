@@ -12,7 +12,7 @@ stream that finishes early does not make the others look faster.
 Per stream we report
   * avg FPS = frames / total time of those frames (a throughput, not a mean of per-frame rates);
   * p95 FPS = 1 / (95th-percentile frame time): the rate of the slowest 5% of frames.
-The Phase 0 target is >= 5 FPS per stream on the RTX 4070. This script measures; it decides
+The Phase 0 target is >= 5 FPS per stream on the RTX 4000 Ada. This script measures; it decides
 nothing. It reads images from disk inside the timed loop (a real stream also decodes frames).
 Units: seconds and frames per second. Nothing here uses ground truth.
 
@@ -40,7 +40,7 @@ from sentinel_ml.localization import data as D
 from sentinel_ml.localization.infer import Detector, DotDetector
 from sentinel_ml.tracking.tracker import PointTracker, TrackerConfig, resolve_config
 
-TARGET_FPS = 5.0  # Phase 0 sheet / ROADMAP E-5: per stream, on the RTX 4070
+TARGET_FPS = 5.0  # Phase 0 sheet / ROADMAP E-5: per stream, on the RTX 4000 Ada
 
 
 @dataclass
@@ -208,11 +208,23 @@ def environment(device: str) -> dict:
     try:
         import torch
         env["torch"] = torch.__version__
+        env["torch_cuda"] = torch.version.cuda  # CUDA version torch was built with (None on CPU)
         if device.startswith("cuda"):
             env["cuda_device"] = torch.cuda.get_device_name(torch.device(device))
     except ImportError:
         env["torch"] = None
     return env
+
+
+def run_settings(cfg: dict, frame_sizes: dict[int, tuple[int, int]], n_streams: list[int]) -> dict:
+    """What was run, so a result can be read without the config: resolution, stride, precision.
+
+    ``frame_sizes`` maps clip -> (w, h) in original pixels. DotDetector has no half-precision
+    path, so precision is always fp32 here; a later fp16 change (E-6) must set this honestly.
+    """
+    return {"frame_size_by_clip": {str(c): list(sz) for c, sz in frame_sizes.items()},
+            "net_size": list(cfg["net_size"]), "frame_stride": int(cfg["frame_stride"]),
+            "fp16": False, "precision": "fp32", "concurrent_streams": list(n_streams)}
 
 
 def make_sync(device: str) -> Callable[[], None]:
@@ -288,7 +300,9 @@ def main() -> None:
     doc = {"label": args.label, "split": args.split, "clips": clips,
            "warmup_frames": args.warmup, "timed_frames_per_stream": args.frames,
            "tracker_config": str(args.tracker_config), "infer_config": str(args.infer_config),
-           "environment": env, "target_fps_per_stream": TARGET_FPS,
+           "environment": env,
+           "settings": run_settings(cfg, {c: frame_size_of(c) for c in clips}, args.streams),
+           "target_fps_per_stream": TARGET_FPS,
            "note": ("B+E per stream, images read from disk inside the timed loop, one shared "
                     "model B, threads in one process; avg FPS = frames / total frame time, "
                     "p95 FPS = 1 / p95 frame time, over the window where all streams run"),

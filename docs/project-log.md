@@ -13,14 +13,14 @@ produce them are in `eval/` and `ml/src/sentinel_ml/`.
 | Tracking count error, >=45-frame filter (offline) | 38.7% mean (median 30.4%) | same run |
 | Tracking count error, run 2 (frozen E-2 config) | 35.2% unfiltered, 37.9% filtered (>=45 frames), mean over clips | DroneCrowd test, second look, not blind, no CMC, no altitude scaling |
 | IDF1 / HOTA, run 2 | 0.388 / 0.300 (run 1: 0.384 / 0.298) | TrackEval IoU 0.5, DroneCrowd test, mean over clips |
-| B speed | 4.79 frames/s (val), 4.78 (test), model only | Kaggle T4, not the 4070, not B+E |
-| E speed, B+E benchmark | not measured yet | |
+| B speed | 4.79 frames/s (val), 4.78 (test), model only | Kaggle T4, not the RTX 4000 Ada, not B+E |
+| B+E speed (measured 2026-11-23) | 1 stream 10.20 FPS avg (p95 10.12); 3 streams lowest 4.43 (p95 3.59); 4 streams lowest 3.32 (p95 2.74) | RTX 4000 Ada, DroneCrowd test clips, 250 frames per stream, fp32, GPU idle; decision 0012 |
 No numeric F1 target exists; the count targets in the draft Phase 0 sheet (unsigned) are treated as
 provisional and nothing is marked pass or fail.
 
 ## 11 Oct: kickoff, dataset, split
 - Agreed with Mahid and Ahmar: DroneCrowd primary, UP-COUNT secondary. The JSON formats were accepted
-  as drafted. GPU work on the 4070, with Kaggle as the fallback. Night footage is not excluded: if the
+  as drafted. GPU work on the RTX 4000 Ada, with Kaggle as the fallback. Night footage is not excluded: if the
   dataset has it, it is used for training and testing. Split and F1 target left open.
 - Downloaded DroneCrowd to `data/dronecrowd` (11 GB) and inspected it with `eval/inspect_dataset.py`:
   112 clips of 300 frames, 1920x1080; 82 train and 30 test clips; ground truth per frame in `.mat`
@@ -320,7 +320,7 @@ provisional and nothing is marked pass or fail.
   against the provisional 35%, IDF1 0.388, HOTA 0.300, the shortfall set by B's detections on night, dusk and
   large-scale clips), and treat improving B as the next investment, scoped before any GPU hours are spent
   (training on the 72 train clips would also give a clean val). E-4 (ID-stability clips) and E-5 (B+E speed on
-  the 4070) are still to do, then integration.
+  the RTX 4000 Ada) are still to do, then integration.
 
 - Decision after the oracle: DDCF is closed and not built (the rule I set before the run said no). For the
   tracker I accept and report the limitation (filtered count error 37.9% against the provisional 35%, IDF1
@@ -329,19 +329,28 @@ provisional and nothing is marked pass or fail.
   scope; dusk is reported separately with no target. Next: E-5 (B+E speed, average and p95 frames/s per
   stream with 3 to 4 streams), then E-4 (ID-stability clips), then the B note.
 
-- E-5 (B+E speed) is written and tested on CPU, but not measured: the 4070 is not available right now. No
-  Kaggle interim number (a T4 miss would say little about the 4070). Status in every table: "not measured
-  (4070 unavailable)". I will book the 4070 and run it myself. Script: `eval/benchmark_be.py`.
+- E-5 (B+E speed) is written and tested on CPU, but not measured: the RTX 4000 Ada is not available right now. No
+  Kaggle interim number (a T4 miss would say little about the RTX 4000 Ada). Status in every table: "not measured
+  (RTX 4000 Ada unavailable)". I will book the RTX 4000 Ada and run it myself. Script: `eval/benchmark_be.py`.
 - E-4 (ID-stability clips): picked the clips by a rule written before rendering, so I do not cherry-pick: rank
   the 30 test clips by run-2 IDF1, take the 4 highest, the 4 lowest and 4 random (seed 0) from the rest; 10 s
   of footage each, from the frozen run-2 tracks. File names carry only the clip number, and the group and
   numbers are in a separate `index.csv` that I open after watching. My judgement is recorded below once I have
   watched them.
 
+- E-4 watched (12 clips, 10 s each, run-2 tracks, test, picked by rule). By eye, with "few" = a couple of people
+  and "some" = 2 to 3 out of 10: clips 16, 22, 23, 24 and 101 are overall stable (a few wrong merges, a few
+  fragments or untracked people); 62 and 63 lose a few people; 17, 18, 108 only have a few people marked at
+  all, 74 (night) has some tracked with id switches, and in 82 about 35% of people in dark areas are not
+  tracked. Best: 23, 24. Worst: 17, 18, 108. This matches the IDF1 ranking (my best two are in the metric-best
+  four, my worst three are in the metric-worst four). The bad clips are B missing people, not id problems.
+  One thing I did not resolve: clips 22 to 24 have 510 to 579 id switches by TrackEval but looked stable by eye.
+  Notes in `docs/decisions/0011-e4-id-stability.md`.
+
 ## Open items
 - E-2a (altitude-scaled gate) and E-2b (camera-motion compensation, full translation, toggles), each
   tested on its own. Camera motion is small on all test clips, so a large effect is not expected.
-- E-4 (ID-stability videos, best and worst clips, my judgement) and E-5 (B+E speed on the 4070 with nothing
+- E-4 (ID-stability videos, best and worst clips, my judgement) and E-5 (B+E speed on the RTX 4000 Ada with nothing
   else running, target 5 frames/s per stream; Kaggle only as fallback).
 - (Closed 18 Oct: DDCF not built, see above.) Earlier question: whether DDCF is needed for the count target, and whether to keep the 25% figure (the draft Phase 0
   sheet is unsigned and says E reaches it only with DDCF in the authors' results). Tell the supervisor.
@@ -350,3 +359,16 @@ provisional and nothing is marked pass or fail.
 - CI has not run on this branch yet (it runs on pushes to `main` and on pull requests); open a pull request.
 - Whether B should be trained on the 72 train clips only, to remove the val contamination; not done, GPU
   hours not measured.
+
+- 2026-11-23, E-5 measured on the RTX 4000 Ada (GPU idle before the run, label "alone"). DroneCrowd test clips 11, 15, 16, 17, 250 timed frames per stream after 10 warm-up, fp32, stride 1, frozen run-2 tracker. 1 stream: avg 10.20 FPS, p95 10.12 (target 5: met). 3 streams: lowest stream avg 4.43, p95 3.59 (not met). 4 streams: lowest avg 3.32, p95 2.74 (not met). Total throughput about 13.7 FPS from 3 streams on. Benchmark script now also records CUDA version, resolution, frame_stride, fp16 flag, stream counts (2 new CPU tests). Not run: with teammates' jobs. Details and E-6 recommendation: `docs/decisions/0012-e5-speed.md`. E-6 not started.
+
+- 2026-11-23, IM-2 written (awaiting approval): `docs/tier1-status.md` (every Tier 1 row Met / Gap / Not measured, with source) and `docs/report-corrections.md` (old and new sentences for Table B.1, abstract, Executive Summary, Section 3.7, 7.5.7, 8.1, Conclusion). Gaps: E count error 37.9% vs 35% (25% stretch also missed); density sparse and moderate 25.1% and 28.0% vs 15% (Ahmar); B+E speed at 3 and 4 streams 4.43 and 3.32 FPS vs 5; latency not measured. Open questions for Ahmed: path to the report LaTeX source; numeric targets for C, D and geometry (none found).
+- Progress of the "do immediately" block (docs/cc-prompt-immediate.md): IM-1 done and committed (approved); IM-2 written, waiting for `approved`; IM-3 (supervisor note, then stop for the supervisor's 25% or 35% answer), IM-4 (ID switches on clips 22 to 24), IM-5 (tick E-1, E-4, E-5 in ROADMAP, ruff, pytest, git status, PR steps) not started. E-6 (fp16, then frame stride 2, then lower resolution, one change at a time, re-measure FPS and F1) needs Ahmed's approval.
+
+- 2026-11-24, IM-3 prepared: `docs/supervisor-note-tracking-target.md` (182 words): count error 37.9% filtered / 35.2% unfiltered (test, 30 clips, 5,092 people, run-2 frozen), target 35% (25% stretch) missed, cause is B's detections (oracle +0.066 IDF1), plan to improve B in Tier 2 with a success rule and Kaggle-hours cap fixed before training, one decision needed (25% or 35% in the Phase 0 sheet). Until the supervisor answers, the target reads "35% (25% stretch), pending sign-off" in `CLAUDE.md` (local file, not in git) and `docs/tier1-status.md`. Open: the supervisor's answer.
+
+- 2026-11-24, IM-4 done (measurement only, frozen run-2 tracks, DroneCrowd test clips 22, 23, 24, no tracker change): `eval/analyse_id_switches.py` reproduces TrackEval's ID-switch counts exactly (510, 579, 558). Each person gets about 2 tracks (mean 2.13 to 2.32) and about 2 switches (1.80, 1.96, 2.21 per GT person); 77% to 86% of switches fall in the first 10 s; about 38% real swaps between two people, 23% to 29% flip-backs, rest new id or re-match after a gap. The IoU threshold is not the cause (IoU 0.3 removes 8% to 21% only). GT heads are about 7 px apart (76% have a neighbour under 10 px) while the scoring box is 20 px, so matching between adjacent heads is ambiguous; a hypothesis, not tested. Conclusion: "stable by eye" holds only at overview scale, not per person; ID stability should be reported as "Met by eye only". Details: `docs/decisions/0013-id-switch-analysis.md`. Validation-only proposals written, not run.
+
+- 2026-11-24, IM-5 housekeeping: ticked E-1, E-4 and E-5 in the local `ROADMAP.md` (E-5 with the note that only the "alone" pass exists; the with-teammates pass was not run). Merged `origin/main` into `feat/ml-tracking-e2` (merge commit, no conflicts; 103 commits from Ahmar and Mahid: density, Models A/C/D, pipeline, backend, frontend). After the merge, `ruff check .` (from `ml/`) passes; `pytest ml/tests` with CPU torch: 457 passed, 8 skipped, 2 failed on this checkout because the DroneCrowd files are not mounted, and both pass (27 passed) in the GPU container where the dataset is mounted. CI has not run on this branch yet; the next step is the pull request. Note: `main` removed the `docs/decisions/` line from `.gitignore`, so our decision files (0001 to 0013) are now untracked, and the numbers 0003, 0006 and 0007 are used twice (ours and main's different files); not committed, waiting for a decision.
+
+- 2026-11-26: wrote `docs/tracking-count-target-issue.md` for the supervisor (what count error is, run 1 and run 2 results, how the target moved from 25% to 35% after the first test result, cause, options, answer form) and updated `docs/supervisor-note-tracking-target.md` (131 words) to state that history and to ask for approval of the night/dusk scope and a signature. Per-clip values checked against `data/outputs/run_comparison/test_per_clip.csv` (means match the log). No new model or tracker runs. Mahid is asking the supervisor; answer still open.

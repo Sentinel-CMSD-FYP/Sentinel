@@ -138,3 +138,15 @@ def test_format_pass_shows_both_fps_and_the_target_verdict():
     run = bm.StreamRun(0, 11, [ft(i * 0.1, 0.1) for i in range(20)])
     text = bm.format_pass(bm.summarise_pass([run]))
     assert "avg FPS" in text and "p95 FPS" in text and "target 5 FPS" in text and "met" in text
+
+
+def test_run_settings_records_resolution_stride_precision_and_streams():
+    cfg = {"net_size": [1920, 1088], "frame_stride": 1}
+    s = bm.run_settings(cfg, {11: (1920, 1080)}, [1, 3, 4])
+    assert s["frame_size_by_clip"] == {"11": [1920, 1080]} and s["net_size"] == [1920, 1088]
+    assert s["frame_stride"] == 1 and s["fp16"] is False and s["concurrent_streams"] == [1, 3, 4]
+
+
+def test_environment_on_cpu_reports_device_and_no_gpu_name():
+    env = bm.environment("cpu")
+    assert env["device"] == "cpu" and "cuda_device" not in env
