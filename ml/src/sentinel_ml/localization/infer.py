@@ -166,6 +166,15 @@ def run_split(detector: Detector, ds: D.DroneCrowdDataset, out_dir: Path, cfg: d
 
 # ---------- the real model (needs torch + the DOT repo's requirements) ----------
 
+def resolve_fp16(cfg: dict, device_type: str) -> bool:
+    """Whether to run the network in fp16 (config key ``fp16``, default off). CUDA only:
+    asking for it on another device is an error, so a result is never labelled fp16 by mistake.
+    """
+    fp16 = bool(cfg.get("fp16", False))
+    if fp16 and device_type != "cuda":
+        raise ValueError(f"fp16 needs a CUDA device, got {device_type!r}")
+    return fp16
+
 @contextlib.contextmanager
 def restricted_torch_load() -> Iterator[None]:
     """Make ``torch.load`` refuse every pickled type outside ``ALLOWED_PICKLE_GLOBALS``.
@@ -223,12 +232,17 @@ class DotDetector:
             model = DotRegressor.load_from_checkpoint(cfg["checkpoint"], map_location="cpu")
         self.model = model.eval().to(self.device)
         self.net_size = tuple(cfg["net_size"])
+        self.fp16 = resolve_fp16(cfg, self.device.type)
 
     def __call__(self, image_rgb: np.ndarray) -> np.ndarray:
         torch = self._torch
         x = preprocess(image_rgb, self.net_size, self.cfg["data_mean"], self.cfg["data_std"])
         with torch.no_grad():
-            y_pred, _, _ = self.model(torch.from_numpy(x).unsqueeze(0).to(self.device))
+            batch = torch.from_numpy(x).unsqueeze(0).to(self.device)
+            # autocast covers the network only; peak finding below runs in fp32
+            with torch.autocast(self.device.type, dtype=torch.float16, enabled=self.fp16):
+                y_pred, _, _ = self.model(batch)
+            y_pred = y_pred.float()
             # columns: class, x, y (network-input pixels), raw logit
             pts = self.model.postprocessing(y_pred, thresh=float(self.cfg["min_score"]))[0]
         pts = pts.detach().cpu().numpy()

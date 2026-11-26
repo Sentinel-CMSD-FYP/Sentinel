@@ -219,12 +219,14 @@ def environment(device: str) -> dict:
 def run_settings(cfg: dict, frame_sizes: dict[int, tuple[int, int]], n_streams: list[int]) -> dict:
     """What was run, so a result can be read without the config: resolution, stride, precision.
 
-    ``frame_sizes`` maps clip -> (w, h) in original pixels. DotDetector has no half-precision
-    path, so precision is always fp32 here; a later fp16 change (E-6) must set this honestly.
+    ``frame_sizes`` maps clip -> (w, h) in original pixels. ``fp16`` is the config key
+    DotDetector reads (E-6); absent means fp32.
     """
+    fp16 = bool(cfg.get("fp16", False))
     return {"frame_size_by_clip": {str(c): list(sz) for c, sz in frame_sizes.items()},
             "net_size": list(cfg["net_size"]), "frame_stride": int(cfg["frame_stride"]),
-            "fp16": False, "precision": "fp32", "concurrent_streams": list(n_streams)}
+            "fp16": fp16, "precision": "fp16" if fp16 else "fp32",
+            "concurrent_streams": list(n_streams)}
 
 
 def make_sync(device: str) -> Callable[[], None]:
