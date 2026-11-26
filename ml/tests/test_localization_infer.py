@@ -145,3 +145,17 @@ def test_restricted_load_restores_torch_load():
     with I.restricted_torch_load():
         assert torch.load is not original
     assert torch.load is original
+
+
+def test_fp16_is_off_unless_the_config_asks_for_it():
+    from sentinel_ml.localization.infer import resolve_fp16
+
+    assert resolve_fp16({}, "cuda") is False and resolve_fp16({}, "cpu") is False
+    assert resolve_fp16({"fp16": True}, "cuda") is True
+
+
+def test_fp16_on_a_cpu_is_refused():
+    from sentinel_ml.localization.infer import resolve_fp16
+
+    with pytest.raises(ValueError, match="CUDA"):
+        resolve_fp16({"fp16": True}, "cpu")

@@ -1,6 +1,6 @@
 # Tier 1 status (honest table)
 
-Date: 2026-11-23. Status is one of **Met / Gap / Not measured**. Every row has a number and a source.
+Date: 2026-11-23, latency row updated 2026-11-26. Status is one of **Met / Gap / Not measured**. Every row has a number and a source.
 Sources: report = `docs/F26_083_i230828_p230686_i230644.pdf` (Table 1.4, 7.5, B.1); log = `docs/project-log.md`;
 dec = `docs/decisions/`. Where a value is not in those files it says "not found, ask Ahmed".
 All DroneCrowd rows are the official test split (30 clips, 9,000 frames) unless stated.
@@ -16,7 +16,7 @@ All DroneCrowd rows are the official test split (30 clips, 9,000 frames) unless 
 | 6 | E: ID stability, trajectories visibly stable over 10 s | Stable by eye on clips 16, 22, 23, 24, 101 where B finds the people; 17, 18, 108 fail because B misses people. TrackEval counts 510, 579, 558 ID switches on clips 22 to 24 (1.8 to 2.2 per person; about 2 tracks per person). IM-4 reproduced the counts and found the 0.5 IoU threshold is not the cause | **Met by eye only; not supported by TrackEval in dense clips** (Ahmed decides the final label) | dec/0011, dec/0013 |
 | 7 | B+E speed >= 5 FPS per stream, 1 stream | 10.20 FPS avg, 10.12 p95 | **Met** | dec/0012: RTX 4000 Ada, test clips, 250 frames, fp32, alone |
 | 8 | B+E speed >= 5 FPS per stream, 3 and 4 concurrent streams | 3 streams: lowest 4.43 avg (p95 3.59); 4 streams: lowest 3.32 avg (p95 2.74) | **Gap** (measured on RTX 4000 Ada, alone; not run with teammates' jobs) | dec/0012 |
-| 9 | End-to-end latency <= 3 s | not measured (a single-stream first check showed 1.4 s; note only) | **Not measured** | report 7.5.7 |
+| 9 | End-to-end latency <= 3 s | Capture to drawn, replayed clip on one PC, headless browser: 1 stream points median 1.15 s, worst 1.67 s; 3 streams 1.38 to 1.40 s, worst 1.79 s; 4 streams 1.52 to 1.54 s, worst 2.07 s (3 runs each). 10 minute 1-stream run: no drift, but process memory grows about 31 MB per minute | **Met (replay, 1 to 4 streams)**; drone video link not included | dec/0015 |
 | 10 | C: infrastructure segmentation | mask mAP50 0.778 obstructions, 0.492 walls (30 held-out images) | No numeric target found, ask Ahmed. Not scored | report 7.5.6 (owner Ahmar) |
 | 11 | D: flow against head motion | recovers up to 0.88 of annotated head speed | No numeric target found, ask Ahmed. Not scored | report B.1 row 8 (owner Mahid) |
 | 12 | Geometry: object of known size | 4.5 m car within 2 to 3% | No numeric target found, ask Ahmed. Not scored | report B.1 row 9 (owner Mahid) |
@@ -26,4 +26,5 @@ All DroneCrowd rows are the official test split (30 clips, 9,000 frames) unless 
 - **Tracking target (pending sign-off):** the target is **35% (25% stretch), pending sign-off**. `CLAUDE.md` used to say 25% (now reads "35% (25% stretch), pending sign-off"); the report says 35% with 25% as stretch; the Phase 0 sheet is unsigned. The note for the supervisor is `docs/supervisor-note-tracking-target.md`; the answer is still open.
 - **Why E misses:** the oracle on test shows perfect association adds only 0.066 IDF1 (0.388 to 0.454), so the limit is Model B's detections (dec and log, 18 Oct).
 - **Rows 10 to 12:** the report's own labels ("Delivered", "Met") have no numeric target behind them in Table 1.4, so they are not given Met or Gap here.
+- Latency (row 9) is a replay on one PC; it leaves out the drone video link. With 4 streams B and E process only about 1 frame in 9 to 10; tracking accuracy at that rate is not measured.
 - Multi-drone, own-footage and real-world validation: none done.

@@ -150,3 +150,8 @@ def test_run_settings_records_resolution_stride_precision_and_streams():
 def test_environment_on_cpu_reports_device_and_no_gpu_name():
     env = bm.environment("cpu")
     assert env["device"] == "cpu" and "cuda_device" not in env
+
+
+def test_run_settings_reports_fp16_when_the_config_turns_it_on():
+    s = bm.run_settings({"net_size": [1920, 1088], "frame_stride": 1, "fp16": True}, {}, [1])
+    assert s["fp16"] is True and s["precision"] == "fp16"
